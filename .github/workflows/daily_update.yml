@@ -32,7 +32,7 @@ jobs:
       - name: 라이브러리 설치
         run: pip install -r requirements.txt
 
-- name: 주식 봇 실행 (텔레그램 전송 포함)
+      - name: 주식 봇 실행 (텔레그램 전송 포함)
         env:  # <--- 이 부분이 '비밀번호 건네주는' 핵심 명령입니다!
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
