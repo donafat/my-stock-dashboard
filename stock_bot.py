@@ -87,3 +87,33 @@ if __name__ == "__main__":
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html_content)
     print("index.html 업데이트 완료!")
+
+import os
+import requests
+import yfinance as yf
+
+# ... (기존 주가 가져오는 코드들) ...
+
+# 예시: 가져온 주가 정보를 텍스트로 정리
+# stock_message = f"삼성전자 현재가: {price}원" 같은 내용이 들어가야 합니다.
+
+# === 텔레그램 전송 함수 추가 ===
+def send_telegram_message(msg):
+    token = os.environ.get('TELEGRAM_TOKEN')
+    chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+    
+    if not token or not chat_id:
+        print("텔레그램 설정이 없습니다.")
+        return
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    data = {'chat_id': chat_id, 'text': msg}
+    
+    try:
+        requests.post(url, data=data)
+        print("텔레그램 전송 완료")
+    except Exception as e:
+        print(f"전송 실패: {e}")
+
+# 마지막에 함수 실행 (보낼 메시지를 넣으세요)
+# send_telegram_message(stock_message)
