@@ -23,11 +23,11 @@ jobs:
       - name: 라이브러리 설치
         run: pip install -r requirements.txt
 
-      - name: 봇 실행 (데이터 수집)
-env:  # <--- 이 부분이 추가되어야 합니다
+- name: Run stock bot
+      env:
         TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python stock_bot.py
+      run: python stock_bot.py
 
       - name: 결과 웹사이트 반영 (Commit & Push)
         run: |
