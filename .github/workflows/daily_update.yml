@@ -24,6 +24,9 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: 봇 실행 (데이터 수집)
+env:
+TELEGRAM_TOKEN:${{8332373801:AAF_b4sMIeW4DlRprezrkLlwOQNgHfT8w_Q}}
+TELEGRAM_CHAT_ID: ${{8357590596}}
         run: python stock_bot.py
 
       - name: 결과 웹사이트 반영 (Commit & Push)
