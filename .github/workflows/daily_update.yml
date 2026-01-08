@@ -2,15 +2,24 @@ name: Stock Update Bot
 
 on:
   schedule:
-    - cron: '30 22 * * *'  # UTC 22:30 (한국 시간 아침 7:30)
-  workflow_dispatch:      # 수동 실행 버튼 (테스트용)
+    - cron: '30 22 * * *'  # 한국 시간 아침 7:30
+  workflow_dispatch:      # 수동 실행 버튼
+
+# 권한 설정 (홈페이지 배포를 위해 필수)
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# 배포 환경 설정
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
+  # 1단계: 파이썬 실행 및 파일 생성
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
     steps:
       - name: 코드 체크아웃
         uses: actions/checkout@v3
@@ -23,8 +32,25 @@ jobs:
       - name: 라이브러리 설치
         run: pip install -r requirements.txt
 
-      - name: Run stock bot
+      - name: 주식 봇 실행 (텔레그램 전송 포함)
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python stock_bot.py
+
+      - name: 결과물(HTML) 업로드 준비
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .  # 현재 폴더의 모든 파일(index.html 포함)을 업로드
+
+  # 2단계: GitHub Pages에 배포
+  deploy:
+    needs: build  # 1단계가 끝나야 실행됨
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: GitHub Pages 배포
+        id: deployment
+        uses: actions/deploy-pages@v4
