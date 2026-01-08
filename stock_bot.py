@@ -1,8 +1,30 @@
-import yfinance as yf
 import pandas as pd
 from datetime import datetime
 import pytz
+import os
+import requests
+import yfinance as yf
 
+def send_telegram_message(msg):
+    token = os.environ.get('TELEGRAM_TOKEN')
+    chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+    
+    if not token or not chat_id:
+        print("⚠️ 텔레그램 설정(토큰/ID)이 없습니다.")
+        return
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    data = {'chat_id': chat_id, 'text': msg}
+    
+    try:
+        response = requests.post(url, data=data)
+        if response.status_code == 200:
+            print("✅ 텔레그램 전송 완료")
+        else:
+            print(f"❌ 전송 실패: {response.text}")
+    except Exception as e:
+        print(f"❌ 에러 발생: {e}")
+        
 # 1. 감시할 종목 리스트 (미국주식 티커) - 여기를 바꾸면 원하는 종목을 볼 수 있어요
 tickers = ["NVDA", "AVGO", "LABU", "MSFT", "AAPL"]
 
