@@ -88,32 +88,16 @@ if __name__ == "__main__":
         f.write(html_content)
     print("index.html 업데이트 완료!")
 
-import os
-import requests
-import yfinance as yf
+# ... (기존 코드들) ...
+# print("index.html 업데이트 완료!")  <-- 아마 이 줄이 끝일 겁니다. 그 밑에 추가하세요.
 
-# ... (기존 주가 가져오는 코드들) ...
+# === [추가할 내용] 텔레그램 발송 실행 ===
+# 1. 보낼 메시지 내용을 만듭니다 (간단하게 성공 알림)
+bot_message = "🚀 주식 봇 업데이트가 완료되었습니다! (Github Actions)"
 
-# 예시: 가져온 주가 정보를 텍스트로 정리
-# stock_message = f"삼성전자 현재가: {price}원" 같은 내용이 들어가야 합니다.
-
-# === 텔레그램 전송 함수 추가 ===
-def send_telegram_message(msg):
-    token = os.environ.get('TELEGRAM_TOKEN')
-    chat_id = os.environ.get('TELEGRAM_CHAT_ID')
-    
-    if not token or not chat_id:
-        print("텔레그램 설정이 없습니다.")
-        return
-
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = {'chat_id': chat_id, 'text': msg}
-    
-    try:
-        requests.post(url, data=data)
-        print("텔레그램 전송 완료")
-    except Exception as e:
-        print(f"전송 실패: {e}")
-
-# 마지막에 함수 실행 (보낼 메시지를 넣으세요)
-# send_telegram_message(stock_message)
+# 2. 아까 만든 전송 함수를 실제로 실행합니다
+try:
+    send_telegram_message(bot_message)
+except NameError:
+    # 혹시 함수 위치가 꼬였을 경우를 대비해 함수가 없으면 경고
+    print("오류: send_telegram_message 함수가 정의되지 않았거나 이름이 다릅니다.")
