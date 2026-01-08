@@ -1,0 +1,35 @@
+name: Stock Update Bot
+
+on:
+  schedule:
+    - cron: '30 22 * * *'  # UTC 22:30 (한국 시간 아침 7:30)
+  workflow_dispatch:      # 수동 실행 버튼 (테스트용)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v3
+
+      - name: 파이썬 설정
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: 라이브러리 설치
+        run: pip install -r requirements.txt
+
+      - name: 봇 실행 (데이터 수집)
+        run: python stock_bot.py
+
+      - name: 결과 웹사이트 반영 (Commit & Push)
+        run: |
+          git config --global user.name "StockBot"
+          git config --global user.email "bot@noreply.github.com"
+          git add index.html
+          git commit -m "Update stock prices" || exit 0
+          git push
