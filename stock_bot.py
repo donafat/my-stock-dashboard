@@ -26,100 +26,49 @@ def send_telegram_message(msg):
         print(f"❌ 에러 발생: {e}")
         
 # 1. 감시할 종목 리스트 (미국주식 티커) - 여기를 바꾸면 원하는 종목을 볼 수 있어요
-tickers = ["NVDA", "AVGO", "LABU", "MSFT", "AAPL"]
+# 1. 감시할 종목 리스트 (원하는 종목으로 바꾸세요)
+tickers = ["NVDA", "TSLA", "AAPL", "MSFT", "SOXL"]
 
-def get_stock_data(tickers):
-    print("데이터 수집 중...")
-    data = []
-    for ticker in tickers:
+# 2. 텔레그램 메시지 시작 부분 만들기
+bot_message = "📈 [맷투자 모닝 브리핑]\n------------------\n"
+
+# HTML 생성을 위한 데이터 저장소
+stock_data = {}
+
+print("데이터 수집을 시작합니다...")
+
+# 3. 반복문 시작 (주가 가져오기 + 메시지 만들기)
+for ticker in tickers:
+    try:
         stock = yf.Ticker(ticker)
-        # 최신 데이터 가져오기 (오늘과 어제)
-        hist = stock.history(period="5d") 
+        # 최신 데이터 가져오기 (fast_info가 빠르고 오류가 적습니다)
+        price = stock.fast_info['last_price'] 
+        prev_close = stock.fast_info['previous_close']
         
-        if len(hist) < 2:
-            continue
-            
-        current_price = hist['Close'].iloc[-1]
-        prev_close = hist['Close'].iloc[-2]
-        change = ((current_price - prev_close) / prev_close) * 100
+        # 변동률 계산
+        change = price - prev_close
+        change_pct = (change / prev_close) * 100
         
-        # 색상 결정 (상승: 빨강, 하락: 파랑 - 한국식 표기)
-        color = "red" if change > 0 else "blue"
-        sign = "+" if change > 0 else ""
+        # 이모지 결정 (오르면 빨강/상승, 내리면 파랑/하락)
+        emoji = "🔺" if change >= 0 else "Vk"
+        sign = "+" if change >= 0 else ""
         
-        data.append({
-            "name": ticker,
-            "price": f"${current_price:.2f}",
-            "change": f"{sign}{change:.2f}%",
-            "color": color
-        })
-    return data
-
-def create_html(stock_data):
-    # 한국 시간 설정
-    kst = pytz.timezone('Asia/Seoul')
-    now = datetime.now(kst).strftime("%Y-%m-%d %H:%M:%S")
-    
-    # HTML 템플릿 (CSS 포함)
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>나만의 주식 대시보드</title>
-        <meta charset="utf-8">
-        <style>
-            body {{ font-family: 'Arial', sans-serif; background-color: #f4f4f9; padding: 20px; }}
-            .container {{ max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }}
-            h1 {{ text-align: center; color: #333; }}
-            .update-time {{ text-align: center; color: #666; font-size: 0.9em; margin-bottom: 20px; }}
-            .stock-item {{ display: flex; justify-content: space-between; padding: 15px; border-bottom: 1px solid #eee; font-size: 1.2em; }}
-            .stock-name {{ font-weight: bold; }}
-            .red {{ color: #e74c3c; }}
-            .blue {{ color: #2980b9; }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>📈 Matt-Tuja Dashboard</h1>
-            <p class="update-time">최근 업데이트: {now} (KST)</p>
-            <div class="stock-list">
-    """
-    
-    for item in stock_data:
-        html += f"""
-            <div class="stock-item">
-                <span class="stock-name">{item['name']}</span>
-                <span>{item['price']} <span class="{item['color']}">({item['change']})</span></span>
-            </div>
-        """
+        # 4. [중요] 텔레그램 메시지에 한 줄 추가하기
+        # 예: 🔺 NVDA: $120.50 (+1.2%)
+        line = f"{emoji} {ticker}: ${price:.2f} ({sign}{change_pct:.2f}%)\n"
+        bot_message += line
         
-    html += """
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    return html
+        print(f"수집 성공: {ticker}")
 
-# 실행 로직
-if __name__ == "__main__":
-    data = get_stock_data(tickers)
-    html_content = create_html(data)
-    
-    with open("index.html", "w", encoding="utf-8") as f:
-        f.write(html_content)
-    print("index.html 업데이트 완료!")
+    except Exception as e:
+        print(f"에러 발생 ({ticker}): {e}")
+        bot_message += f"⚠️ {ticker}: 데이터 수집 실패\n"
 
-# ... (기존 코드들) ...
-# print("index.html 업데이트 완료!")  <-- 아마 이 줄이 끝일 겁니다. 그 밑에 추가하세요.
+# 5. HTML 파일 업데이트 (기존 코드 유지)
+# ... (HTML 만드는 코드가 있다면 여기에 그대로 둡니다) ...
 
-# === [추가할 내용] 텔레그램 발송 실행 ===
-# 1. 보낼 메시지 내용을 만듭니다 (간단하게 성공 알림)
-bot_message = "🚀 주식 봇 업데이트가 완료되었습니다! (Github Actions)"
+bot_message += "------------------\n👉 대시보드 확인: https://donaq.github.io/my-stock-dashboard/"
 
-# 2. 아까 만든 전송 함수를 실제로 실행합니다
-try:
-    send_telegram_message(bot_message)
-except NameError:
-    # 혹시 함수 위치가 꼬였을 경우를 대비해 함수가 없으면 경고
-    print("오류: send_telegram_message 함수가 정의되지 않았거나 이름이 다릅니다.")
+# 6. 최종 메시지 전송
+print("텔레그램 전송 중...")
+send_telegram_message(bot_message)
