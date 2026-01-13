@@ -16,7 +16,7 @@ def send_telegram_message(msg):
             pass # 전송 실패해도 HTML 생성은 계속 진행해야 함
 
 # === 2. 주식 종목 설정 ===
-tickers = ["NVDA", "TSLA", "AAPL", "MSFT", "SOXL"]
+tickers = ["NVDA", "TSLA", "AAPL", "MSFT", "SOXL", "GOOGL", "IONQ", "ETN", "TSM", "MU"]
 
 # === 3. 데이터 수집 시작 ===
 bot_message = "📈 [맷투자 모닝 브리핑]\n------------------\n"
