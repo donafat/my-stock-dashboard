@@ -164,4 +164,6 @@ if __name__ == "__main__":
         
         time.sleep(0.5)
 
-    # (4) 텔레그램
+    # (4) 텔레그램 전송
+    send_telegram_message(bot_message)
+    print("전송 완료")
