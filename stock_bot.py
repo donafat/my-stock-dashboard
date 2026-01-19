@@ -16,7 +16,7 @@ def send_telegram_message(msg):
         except:
             pass 
 
-# === 2. 시간별 비 예보 분석 함수 ===
+# === 2. 날씨 정보 함수 (오전/오후/비예보) ===
 def get_weather_forecast(location):
     try:
         url = f"https://wttr.in/{location}?format=j1&lang=ko"
@@ -26,16 +26,9 @@ def get_weather_forecast(location):
             data = response.json()
             weather_today = data['weather'][0]['hourly']
             
-            # 오전 9시 / 오후 3시 날씨
-            am_data = weather_today[3]
-            pm_data = weather_today[5]
+            am_data = weather_today[3] # 09:00
+            pm_data = weather_today[5] # 15:00
             
-            am_temp = am_data['tempC']
-            am_desc = am_data['lang_ko'][0]['value']
-            pm_temp = pm_data['tempC']
-            pm_desc = pm_data['lang_ko'][0]['value']
-
-            # 비 오는 시간 분석 (06시 ~ 21시)
             rain_timeline = []
             check_indices = [2, 3, 4, 5, 6, 7] 
             
@@ -43,30 +36,73 @@ def get_weather_forecast(location):
                 hour_data = weather_today[idx]
                 rain_prob = int(hour_data['chanceofrain'])
                 time_str = int(hour_data['time']) // 100 
-                
                 if rain_prob >= 30:
                     rain_timeline.append(f"{time_str}시({rain_prob}%)")
             
             result = f"📍 {location}\n"
-            result += f" - 오전(09시): {am_temp}°C, {am_desc}\n"
-            result += f" - 오후(15시): {pm_temp}°C, {pm_desc}\n"
+            result += f" - 오전: {am_data['tempC']}°C, {am_data['lang_ko'][0]['value']}\n"
+            result += f" - 오후: {pm_data['tempC']}°C, {pm_data['lang_ko'][0]['value']}\n"
             
             if rain_timeline:
                 result += f" ☔ 비 예보: {', '.join(rain_timeline)}"
             else:
-                result += " ✨ 하루 종일 비 예보 없음"
-                
+                result += " ✨ 비 예보 없음"
             return result
         else:
             return f"📍 {location}: 정보 없음"
-            
-    except Exception as e:
-        return f"📍 {location}: 서버 연결 실패"
+    except:
+        return f"📍 {location}: 연결 실패"
 
-# === 3. 주식 종목 설정 ===
+# === 3. 시장 주요 지표 (S&P 500 포함) ===
+def get_market_indices():
+    msg = ""
+    # 주요 지수 티커 설정
+    indices = {
+        "💵 환율 (USD/KRW)": "KRW=X",
+        "🇰🇷 코스피 (KOSPI)": "^KS11",
+        "🇺🇸 S&P 500": "^GSPC",        # [확인] S&P 500 추가됨
+        "💻 나스닥 (NASDAQ)": "^IXIC",
+        "😱 공포지수 (VIX)": "^VIX"
+    }
+    
+    msg += "🌎 **글로벌 시장 지표**\n"
+    for name, ticker in indices.items():
+        try:
+            stock = yf.Ticker(ticker)
+            # 코스피 등 데이터 확보를 위해 5일치 요청
+            hist = stock.history(period="5d") 
+            
+            if len(hist) >= 1:
+                price = hist['Close'].iloc[-1]
+                
+                change_str = ""
+                if len(hist) >= 2:
+                    prev = hist['Close'].iloc[-2]
+                    change = ((price - prev) / prev) * 100
+                    
+                    # 이모티콘 설정
+                    if "VIX" in name:
+                        icon = "🔥" if change > 5 else "😌" if change < -5 else " "
+                    else:
+                        icon = "🔺" if change > 0 else "💙" if change < 0 else "➖"
+                    
+                    change_str = f"({change:+.2f}%) {icon}"
+
+                # 환율은 소수점 2자리, 지수도 보기 좋게 포맷팅
+                if "환율" in name:
+                    msg += f"- {name}: {price:,.2f}원 {change_str}\n"
+                else:
+                    msg += f"- {name}: {price:,.2f} {change_str}\n"
+        except:
+            msg += f"- {name}: 확인 불가\n"
+        time.sleep(0.3)
+    
+    return msg + "------------------\n"
+
+# === 4. 주식 종목 설정 ===
 tickers = ["SWKS","NVDA", "TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO", "AMZN", "NFLX", "GOOGL", "IONQ","PLTR","ETN", "TSM", "MU", "AXON","META"]
 
-# === 4. 메인 실행 로직 ===
+# === 5. 메인 실행 로직 ===
 if __name__ == "__main__":
     bot_message = "📈 [맷투자 모닝 브리핑]\n"
     current_time = datetime.now(pytz.timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M")
@@ -74,14 +110,18 @@ if __name__ == "__main__":
     
     # (1) 날씨 정보
     print("날씨 정보 수집 중...")
-    bot_message += "🌤 **오늘의 날씨 체크**\n"
+    bot_message += "🌤 **오늘의 날씨**\n"
     bot_message += get_weather_forecast("Seongdong-gu") + "\n\n"
     bot_message += get_weather_forecast("Gangnam-gu") + "\n"
     bot_message += "------------------\n"
 
-    # (2) 주식 정보
+    # (2) 시장 지표 (S&P 500 포함)
+    print("시장 지표 수집 중...")
+    bot_message += get_market_indices()
+
+    # (3) 개별 주식 정보
     print("주식 정보 수집 중...")
-    bot_message += "📊 **미국 주식 현황**\n"
+    bot_message += "📊 **관심 종목 현황**\n"
     
     for ticker in tickers:
         try:
@@ -95,13 +135,9 @@ if __name__ == "__main__":
                     prev_close = hist['Close'].iloc[-2]
                     change = ((close_price - prev_close) / prev_close) * 100
                     
-                    # [수정됨] 이모티콘 설정: 상승(빨강) / 하락(파랑)
-                    if change > 0:
-                        emoji = "🔺" # 상승
-                    elif change < 0:
-                        emoji = "💙" # 하락 (파란 하트) - 원하시는 다른 걸로 바꿔도 됩니다 (예: ⬇️)
-                    else:
-                        emoji = "➖" # 보합
+                    if change > 0: emoji = "🔺" 
+                    elif change < 0: emoji = "💙"
+                    else: emoji = "➖"
 
                     bot_message += f"{emoji} {ticker}: ${close_price:.2f} ({change:+.2f}%)\n"
                 else:
@@ -109,12 +145,11 @@ if __name__ == "__main__":
             else:
                 bot_message += f"⚠️ {ticker}: 데이터 없음\n"
                 
-        except Exception as e:
-            print(f"{ticker} 에러: {e}")
+        except:
             bot_message += f"⚠️ {ticker}: 확인 불가\n"
         
         time.sleep(0.5)
 
-    # (3) 텔레그램 전송
+    # (4) 텔레그램 전송
     send_telegram_message(bot_message)
     print("전송 완료")
