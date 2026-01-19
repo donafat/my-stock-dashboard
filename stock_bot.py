@@ -16,13 +16,9 @@ def send_telegram_message(msg):
         except:
             pass 
 
-# === 2. [업그레이드] 시간별 비 예보 분석 함수 ===
+# === 2. 시간별 비 예보 분석 함수 ===
 def get_weather_forecast(location):
-    """
-    오전(09시), 오후(15시) 날씨와 '비 오는 시간'을 콕 집어 알려줍니다.
-    """
     try:
-        # format=j1: 상세 데이터를 JSON으로 요청
         url = f"https://wttr.in/{location}?format=j1&lang=ko"
         response = requests.get(url, timeout=10)
         
@@ -30,8 +26,7 @@ def get_weather_forecast(location):
             data = response.json()
             weather_today = data['weather'][0]['hourly']
             
-            # (1) 대표 시간대 날씨 (오전 9시 / 오후 3시)
-            # index 3 = 09:00, index 5 = 15:00
+            # 오전 9시 / 오후 3시 날씨
             am_data = weather_today[3]
             pm_data = weather_today[5]
             
@@ -40,20 +35,18 @@ def get_weather_forecast(location):
             pm_temp = pm_data['tempC']
             pm_desc = pm_data['lang_ko'][0]['value']
 
-            # (2) 비 오는 시간 분석 (06시 ~ 21시 사이 스캔)
-            # 강수확률(chanceofrain)이 30% 이상인 시간만 찾기
+            # 비 오는 시간 분석 (06시 ~ 21시)
             rain_timeline = []
-            check_indices = [2, 3, 4, 5, 6, 7] # 06, 09, 12, 15, 18, 21시
+            check_indices = [2, 3, 4, 5, 6, 7] 
             
             for idx in check_indices:
                 hour_data = weather_today[idx]
                 rain_prob = int(hour_data['chanceofrain'])
-                time_str = int(hour_data['time']) // 100 # 900 -> 9
+                time_str = int(hour_data['time']) // 100 
                 
-                if rain_prob >= 30: # 기준: 강수확률 30% 이상
+                if rain_prob >= 30:
                     rain_timeline.append(f"{time_str}시({rain_prob}%)")
             
-            # (3) 메시지 조합
             result = f"📍 {location}\n"
             result += f" - 오전(09시): {am_temp}°C, {am_desc}\n"
             result += f" - 오후(15시): {pm_temp}°C, {pm_desc}\n"
@@ -68,7 +61,6 @@ def get_weather_forecast(location):
             return f"📍 {location}: 정보 없음"
             
     except Exception as e:
-        print(f"날씨 에러: {e}")
         return f"📍 {location}: 서버 연결 실패"
 
 # === 3. 주식 종목 설정 ===
@@ -80,16 +72,14 @@ if __name__ == "__main__":
     current_time = datetime.now(pytz.timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M")
     bot_message += f"📅 {current_time}\n------------------\n"
     
-    # (1) 날씨 정보 수집
+    # (1) 날씨 정보
     print("날씨 정보 수집 중...")
     bot_message += "🌤 **오늘의 날씨 체크**\n"
-    
-    # 성동구, 강남구(대치동)
     bot_message += get_weather_forecast("Seongdong-gu") + "\n\n"
     bot_message += get_weather_forecast("Gangnam-gu") + "\n"
     bot_message += "------------------\n"
 
-    # (2) 주식 정보 수집
+    # (2) 주식 정보
     print("주식 정보 수집 중...")
     bot_message += "📊 **미국 주식 현황**\n"
     
@@ -104,7 +94,15 @@ if __name__ == "__main__":
                 if len(hist) >= 2:
                     prev_close = hist['Close'].iloc[-2]
                     change = ((close_price - prev_close) / prev_close) * 100
-                    emoji = "🔺" if change > 0 else "Vk" if change < 0 else "➖"
+                    
+                    # [수정됨] 이모티콘 설정: 상승(빨강) / 하락(파랑)
+                    if change > 0:
+                        emoji = "🔺" # 상승
+                    elif change < 0:
+                        emoji = "💙" # 하락 (파란 하트) - 원하시는 다른 걸로 바꿔도 됩니다 (예: ⬇️)
+                    else:
+                        emoji = "➖" # 보합
+
                     bot_message += f"{emoji} {ticker}: ${close_price:.2f} ({change:+.2f}%)\n"
                 else:
                     bot_message += f"➖ {ticker}: ${close_price:.2f}\n"
