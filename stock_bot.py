@@ -5,21 +5,31 @@ from datetime import datetime
 import pytz
 import time
 
-# === 1. 텔레그램 전송 함수 ===
+# === 1. 텔레그램 전송 함수 (Markdown 적용) ===
 def send_telegram_message(msg):
     token = os.environ.get('TELEGRAM_TOKEN')
     chat_id = os.environ.get('TELEGRAM_CHAT_ID')
     if token and chat_id:
+        # [중요] 링크 기능을 위해 parse_mode='Markdown' 추가
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         try:
-            requests.post(url, data={'chat_id': chat_id, 'text': msg})
+            requests.post(url, data={
+                'chat_id': chat_id, 
+                'text': msg, 
+                'parse_mode': 'Markdown',
+                'disable_web_page_preview': 'true' # 링크 미리보기 끄기 (깔끔하게)
+            })
         except:
             pass 
 
-# === 2. 날씨 정보 함수 (오전/오후/비예보) ===
-def get_weather_forecast(location):
+# === 2. 날씨 정보 함수 ===
+def get_weather_forecast(location_eng, location_kor):
+    """
+    location_eng: wttr.in 검색용 (예: Seongdong-gu)
+    location_kor: 네이버/케이웨더 링크용 (예: 성동구)
+    """
     try:
-        url = f"https://wttr.in/{location}?format=j1&lang=ko"
+        url = f"https://wttr.in/{location_eng}?format=j1&lang=ko"
         response = requests.get(url, timeout=10)
         
         if response.status_code == 200:
@@ -39,38 +49,44 @@ def get_weather_forecast(location):
                 if rain_prob >= 30:
                     rain_timeline.append(f"{time_str}시({rain_prob}%)")
             
-            result = f"📍 {location}\n"
+            # 기본 텍스트 정보
+            result = f"📍 *{location_eng}* ({location_kor})\n"
             result += f" - 오전: {am_data['tempC']}°C, {am_data['lang_ko'][0]['value']}\n"
             result += f" - 오후: {pm_data['tempC']}°C, {pm_data['lang_ko'][0]['value']}\n"
             
             if rain_timeline:
-                result += f" ☔ 비 예보: {', '.join(rain_timeline)}"
+                result += f" ☔ 비 예보: {', '.join(rain_timeline)}\n"
             else:
-                result += " ✨ 비 예보 없음"
+                result += " ✨ 비 예보 없음\n"
+            
+            # [추가] 상세 날씨 바로가기 링크 (네이버 날씨가 가장 URL 접근이 정확함)
+            # 케이웨더는 URL에 지역코드가 필요해 자동화가 어려우므로, 
+            # 케이웨더 데이터를 사용하는 네이버 날씨 링크를 제공합니다.
+            link = f"https://search.naver.com/search.naver?query={location_kor}+날씨"
+            result += f" 👉 [🔎 {location_kor} 상세 날씨/미세먼지 보기]({link})"
+            
             return result
         else:
-            return f"📍 {location}: 정보 없음"
+            return f"📍 {location_eng}: 정보 없음"
     except:
-        return f"📍 {location}: 연결 실패"
+        return f"📍 {location_eng}: 연결 실패"
 
-# === 3. 시장 주요 지표 (S&P 500 포함) ===
+# === 3. 시장 주요 지표 ===
 def get_market_indices():
     msg = ""
-    # 주요 지수 티커 설정
     indices = {
         "💵 환율 (USD/KRW)": "KRW=X",
         "🇰🇷 코스피 (KOSPI)": "^KS11",
-        "🇺🇸 S&P 500": "^GSPC",        # [확인] S&P 500 추가됨
+        "🇺🇸 S&P 500": "^GSPC",
         "💻 나스닥 (NASDAQ)": "^IXIC",
         "😱 공포지수 (VIX)": "^VIX"
     }
     
-    msg += "🌎 **글로벌 시장 지표**\n"
+    msg += "🌎 *글로벌 시장 지표*\n"
     for name, ticker in indices.items():
         try:
             stock = yf.Ticker(ticker)
-            # 코스피 등 데이터 확보를 위해 5일치 요청
-            hist = stock.history(period="5d") 
+            hist = stock.history(period="5d")
             
             if len(hist) >= 1:
                 price = hist['Close'].iloc[-1]
@@ -80,7 +96,6 @@ def get_market_indices():
                     prev = hist['Close'].iloc[-2]
                     change = ((price - prev) / prev) * 100
                     
-                    # 이모티콘 설정
                     if "VIX" in name:
                         icon = "🔥" if change > 5 else "😌" if change < -5 else " "
                     else:
@@ -88,7 +103,6 @@ def get_market_indices():
                     
                     change_str = f"({change:+.2f}%) {icon}"
 
-                # 환율은 소수점 2자리, 지수도 보기 좋게 포맷팅
                 if "환율" in name:
                     msg += f"- {name}: {price:,.2f}원 {change_str}\n"
                 else:
@@ -104,24 +118,24 @@ tickers = ["SWKS","NVDA", "TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL"
 
 # === 5. 메인 실행 로직 ===
 if __name__ == "__main__":
-    bot_message = "📈 [맷투자 모닝 브리핑]\n"
+    bot_message = "📈 *[맷투자 모닝 브리핑]*\n"
     current_time = datetime.now(pytz.timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M")
     bot_message += f"📅 {current_time}\n------------------\n"
     
-    # (1) 날씨 정보
+    # (1) 날씨 정보 (한국어 지명 추가)
     print("날씨 정보 수집 중...")
-    bot_message += "🌤 **오늘의 날씨**\n"
-    bot_message += get_weather_forecast("Seongdong-gu") + "\n\n"
-    bot_message += get_weather_forecast("Gangnam-gu") + "\n"
+    bot_message += "🌤 *오늘의 날씨*\n"
+    bot_message += get_weather_forecast("Seongdong-gu", "성동구") + "\n\n"
+    bot_message += get_weather_forecast("Gangnam-gu", "대치동") + "\n"
     bot_message += "------------------\n"
 
-    # (2) 시장 지표 (S&P 500 포함)
+    # (2) 시장 지표
     print("시장 지표 수집 중...")
     bot_message += get_market_indices()
 
     # (3) 개별 주식 정보
     print("주식 정보 수집 중...")
-    bot_message += "📊 **관심 종목 현황**\n"
+    bot_message += "📊 *관심 종목 현황*\n"
     
     for ticker in tickers:
         try:
@@ -150,6 +164,4 @@ if __name__ == "__main__":
         
         time.sleep(0.5)
 
-    # (4) 텔레그램 전송
-    send_telegram_message(bot_message)
-    print("전송 완료")
+    # (4) 텔레그램
