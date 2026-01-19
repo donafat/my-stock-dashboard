@@ -16,24 +16,60 @@ def send_telegram_message(msg):
         except:
             pass 
 
-# === 2. 날씨 가져오는 함수 (wttr.in 서비스 사용) ===
-def get_weather(location):
+# === 2. [업그레이드] 시간별 비 예보 분석 함수 ===
+def get_weather_forecast(location):
     """
-    네이버 대신 봇 차단이 없는 wttr.in 날씨 서비스를 사용합니다.
-    location: 지역명 (예: Seoul, Seongdong-gu)
+    오전(09시), 오후(15시) 날씨와 '비 오는 시간'을 콕 집어 알려줍니다.
     """
     try:
-        # format=3: "지역: 날씨이모티콘 온도" 형태로 간략하게 받기
-        # lang=ko: 한국어로 결과 받기
-        url = f"https://wttr.in/{location}?format=%l:+%c+%t&lang=ko"
+        # format=j1: 상세 데이터를 JSON으로 요청
+        url = f"https://wttr.in/{location}?format=j1&lang=ko"
         response = requests.get(url, timeout=10)
         
         if response.status_code == 200:
-            return response.text.strip()
+            data = response.json()
+            weather_today = data['weather'][0]['hourly']
+            
+            # (1) 대표 시간대 날씨 (오전 9시 / 오후 3시)
+            # index 3 = 09:00, index 5 = 15:00
+            am_data = weather_today[3]
+            pm_data = weather_today[5]
+            
+            am_temp = am_data['tempC']
+            am_desc = am_data['lang_ko'][0]['value']
+            pm_temp = pm_data['tempC']
+            pm_desc = pm_data['lang_ko'][0]['value']
+
+            # (2) 비 오는 시간 분석 (06시 ~ 21시 사이 스캔)
+            # 강수확률(chanceofrain)이 30% 이상인 시간만 찾기
+            rain_timeline = []
+            check_indices = [2, 3, 4, 5, 6, 7] # 06, 09, 12, 15, 18, 21시
+            
+            for idx in check_indices:
+                hour_data = weather_today[idx]
+                rain_prob = int(hour_data['chanceofrain'])
+                time_str = int(hour_data['time']) // 100 # 900 -> 9
+                
+                if rain_prob >= 30: # 기준: 강수확률 30% 이상
+                    rain_timeline.append(f"{time_str}시({rain_prob}%)")
+            
+            # (3) 메시지 조합
+            result = f"📍 {location}\n"
+            result += f" - 오전(09시): {am_temp}°C, {am_desc}\n"
+            result += f" - 오후(15시): {pm_temp}°C, {pm_desc}\n"
+            
+            if rain_timeline:
+                result += f" ☔ 비 예보: {', '.join(rain_timeline)}"
+            else:
+                result += " ✨ 하루 종일 비 예보 없음"
+                
+            return result
         else:
-            return f"{location}: 정보 없음"
+            return f"📍 {location}: 정보 없음"
+            
     except Exception as e:
-        return f"{location}: 날씨 서버 연결 실패"
+        print(f"날씨 에러: {e}")
+        return f"📍 {location}: 서버 연결 실패"
 
 # === 3. 주식 종목 설정 ===
 tickers = ["SWKS","NVDA", "TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO", "AMZN", "NFLX", "GOOGL", "IONQ","PLTR","ETN", "TSM", "MU", "AXON","META"]
@@ -44,12 +80,13 @@ if __name__ == "__main__":
     current_time = datetime.now(pytz.timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M")
     bot_message += f"📅 {current_time}\n------------------\n"
     
-    # (1) 날씨 정보 수집 (차단 방지를 위해 지역명을 명확하게 변경 추천)
+    # (1) 날씨 정보 수집
     print("날씨 정보 수집 중...")
-    bot_message += "🌤 **오늘의 날씨**\n"
-    # wttr.in은 '구' 단위까지가 정확합니다.
-    bot_message += get_weather("Seongdong-gu") + "\n" 
-    bot_message += get_weather("Gangnam-gu") + " (대치동 인근)\n"
+    bot_message += "🌤 **오늘의 날씨 체크**\n"
+    
+    # 성동구, 강남구(대치동)
+    bot_message += get_weather_forecast("Seongdong-gu") + "\n\n"
+    bot_message += get_weather_forecast("Gangnam-gu") + "\n"
     bot_message += "------------------\n"
 
     # (2) 주식 정보 수집
@@ -59,7 +96,6 @@ if __name__ == "__main__":
     for ticker in tickers:
         try:
             stock = yf.Ticker(ticker)
-            # 서버에서 안정적인 history 함수 사용
             hist = stock.history(period="2d")
             
             if len(hist) >= 1:
@@ -79,7 +115,7 @@ if __name__ == "__main__":
             print(f"{ticker} 에러: {e}")
             bot_message += f"⚠️ {ticker}: 확인 불가\n"
         
-        time.sleep(0.5) # 차단 방지 대기
+        time.sleep(0.5)
 
     # (3) 텔레그램 전송
     send_telegram_message(bot_message)
