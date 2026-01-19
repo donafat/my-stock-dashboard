@@ -1,5 +1,6 @@
 import os
 import requests
+from bs4 import BeautifulSoup  # <--- 이 줄이 꼭 있어야 합니다!
 import yfinance as yf
 from datetime import datetime
 import pytz
@@ -13,14 +14,31 @@ def send_telegram_message(msg):
         try:
             requests.post(url, data={'chat_id': chat_id, 'text': msg})
         except:
-            pass # 전송 실패해도 HTML 생성은 계속 진행해야 함
+            pass 
+
+# === [새로 추가된 코드] 날씨 가져오는 함수 ===
+def get_weather(location):
+    url = f"https://search.naver.com/search.naver?query={location} 날씨"
+    try:
+        html = requests.get(url).text
+        soup = BeautifulSoup(html, 'html.parser')
+        temp = soup.find('div', {'class': 'temperature_text'}).text.strip().replace('현재 온도', '')
+        status = soup.find('span', {'class': 'weather_before_text'}).text.strip()
+        return f"{location}: {temp} ({status})"
+    except:
+        return f"{location}: 날씨 정보 오류"
 
 # === 2. 주식 종목 설정 ===
 tickers = ["SWKS","NVDA", "TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO", "AMZN", "NFLX", "GOOGL", "IONQ","PLTR","ETN", "TSM", "MU", "AXON","META"]
 
 # === 3. 데이터 수집 시작 ===
 bot_message = "📈 [맷투자 모닝 브리핑]\n------------------\n"
-stock_data = {} # HTML을 위한 데이터 저장소
+
+# === [새로 추가된 코드] 날씨 정보 먼저 넣기 ===
+bot_message += "🌤 **오늘의 날씨**\n"
+bot_message += get_weather("성동구") + "\n"
+bot_message += get_weather("대치동") + "\n"
+bot_message += "------------------\n"
 
 print("데이터 수집 중...")
 
