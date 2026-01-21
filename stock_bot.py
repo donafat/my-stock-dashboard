@@ -5,29 +5,24 @@ from datetime import datetime
 import pytz
 import time
 
-# === 1. 텔레그램 전송 함수 (Markdown 적용) ===
+# === 1. 텔레그램 전송 함수 ===
 def send_telegram_message(msg):
     token = os.environ.get('TELEGRAM_TOKEN')
     chat_id = os.environ.get('TELEGRAM_CHAT_ID')
     if token and chat_id:
-        # [중요] 링크 기능을 위해 parse_mode='Markdown' 추가
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         try:
             requests.post(url, data={
                 'chat_id': chat_id, 
                 'text': msg, 
                 'parse_mode': 'Markdown',
-                'disable_web_page_preview': 'true' # 링크 미리보기 끄기 (깔끔하게)
+                'disable_web_page_preview': 'true'
             })
-        except:
-            pass 
+        except Exception as e:
+            print(f"전송 실패: {e}")
 
 # === 2. 날씨 정보 함수 ===
 def get_weather_forecast(location_eng, location_kor):
-    """
-    location_eng: wttr.in 검색용 (예: Seongdong-gu)
-    location_kor: 네이버/케이웨더 링크용 (예: 성동구)
-    """
     try:
         url = f"https://wttr.in/{location_eng}?format=j1&lang=ko"
         response = requests.get(url, timeout=10)
@@ -36,35 +31,16 @@ def get_weather_forecast(location_eng, location_kor):
             data = response.json()
             weather_today = data['weather'][0]['hourly']
             
+            # 현재 시간대에 맞는 예보 가져오기 (오전/오후 단순화)
             am_data = weather_today[3] # 09:00
-            pm_data = weather_today[5] # 15:00
+            pm_data = weather_today[6] # 18:00
             
-            rain_timeline = []
-            check_indices = [2, 3, 4, 5, 6, 7] 
-            
-            for idx in check_indices:
-                hour_data = weather_today[idx]
-                rain_prob = int(hour_data['chanceofrain'])
-                time_str = int(hour_data['time']) // 100 
-                if rain_prob >= 30:
-                    rain_timeline.append(f"{time_str}시({rain_prob}%)")
-            
-            # 기본 텍스트 정보
             result = f"📍 *{location_eng}* ({location_kor})\n"
-            result += f" - 오전: {am_data['tempC']}°C, {am_data['lang_ko'][0]['value']}\n"
-            result += f" - 오후: {pm_data['tempC']}°C, {pm_data['lang_ko'][0]['value']}\n"
+            result += f" - 오전/오후 기온: {am_data['tempC']}°C / {pm_data['tempC']}°C\n"
+            result += f" - 상태: {pm_data['lang_ko'][0]['value']}\n"
             
-            if rain_timeline:
-                result += f" ☔ 비 예보: {', '.join(rain_timeline)}\n"
-            else:
-                result += " ✨ 비 예보 없음\n"
-            
-            # [추가] 상세 날씨 바로가기 링크 (네이버 날씨가 가장 URL 접근이 정확함)
-            # 케이웨더는 URL에 지역코드가 필요해 자동화가 어려우므로, 
-            # 케이웨더 데이터를 사용하는 네이버 날씨 링크를 제공합니다.
             link = f"https://search.naver.com/search.naver?query={location_kor}+날씨"
-            result += f" 👉 [🔎 {location_kor} 상세 날씨/미세먼지 보기]({link})"
-            
+            result += f" 👉 [🔎 상세 날씨 보기]({link})"
             return result
         else:
             return f"📍 {location_eng}: 정보 없음"
@@ -76,22 +52,23 @@ def get_market_indices():
     msg = ""
     indices = {
         "💵 환율 (USD/KRW)": "KRW=X",
-        "🇰🇷 코스피 (KOSPI)": "^KS11",
+        "🇰🇷 코스피": "^KS11",
         "🇺🇸 S&P 500": "^GSPC",
-        "💻 나스닥 (NASDAQ)": "^IXIC",
-        "😱 공포지수 (VIX)": "^VIX"
+        "💻 나스닥": "^IXIC",
+        "😱 공포지수": "^VIX"
     }
     
     msg += "🌎 *글로벌 시장 지표*\n"
     for name, ticker in indices.items():
         try:
+            # 시장 지표는 하루 단위 변화가 중요하므로 5일치 일별 데이터 사용
             stock = yf.Ticker(ticker)
             hist = stock.history(period="5d")
             
             if len(hist) >= 1:
                 price = hist['Close'].iloc[-1]
-                
                 change_str = ""
+                
                 if len(hist) >= 2:
                     prev = hist['Close'].iloc[-2]
                     change = ((price - prev) / prev) * 100
@@ -100,7 +77,6 @@ def get_market_indices():
                         icon = "🔥" if change > 5 else "😌" if change < -5 else " "
                     else:
                         icon = "🔺" if change > 0 else "💙" if change < 0 else "➖"
-                    
                     change_str = f"({change:+.2f}%) {icon}"
 
                 if "환율" in name:
@@ -109,8 +85,7 @@ def get_market_indices():
                     msg += f"- {name}: {price:,.2f} {change_str}\n"
         except:
             msg += f"- {name}: 확인 불가\n"
-        time.sleep(0.3)
-    
+            
     return msg + "------------------\n"
 
 # === 4. 주식 종목 설정 ===
@@ -118,51 +93,95 @@ tickers = ["SWKS","NVDA", "TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL"
 
 # === 5. 메인 실행 로직 ===
 if __name__ == "__main__":
-    bot_message = "📈 *[맷투자 모닝 브리핑]*\n"
-    current_time = datetime.now(pytz.timezone('Asia/Seoul')).strftime("%Y-%m-%d %H:%M")
-    bot_message += f"📅 {current_time}\n------------------\n"
+    # 한국 시간 가져오기
+    kst = pytz.timezone('Asia/Seoul')
+    now = datetime.now(kst)
+    current_time_str = now.strftime("%Y-%m-%d %H:%M")
     
-    # (1) 날씨 정보 (한국어 지명 추가)
-    print("날씨 정보 수집 중...")
-    bot_message += "🌤 *오늘의 날씨*\n"
-    bot_message += get_weather_forecast("Seongdong-gu", "성동구") + "\n\n"
-    bot_message += get_weather_forecast("Gangnam-gu", "대치동") + "\n"
-    bot_message += "------------------\n"
+    # 오후 2시 이후면 '저녁 프리장 체크' 모드, 아니면 '아침 브리핑' 모드
+    is_evening_mode = now.hour >= 14 
+    
+    if is_evening_mode:
+        title = "🌙 *[미국주식 프리장 체크]*"
+    else:
+        title = "📈 *[맷투자 모닝 브리핑]*"
 
-    # (2) 시장 지표
+    bot_message = f"{title}\n📅 {current_time_str}\n------------------\n"
+    
+    # (1) 날씨 (아침에만 자세히, 저녁엔 생략하거나 간단히 - 여기선 아침에만 표시로 설정)
+    if not is_evening_mode:
+        print("날씨 정보 수집 중...")
+        bot_message += "🌤 *오늘의 날씨*\n"
+        bot_message += get_weather_forecast("Seongdong-gu", "성동구") + "\n"
+        bot_message += get_weather_forecast("Gangnam-gu", "대치동") + "\n"
+        bot_message += "------------------\n"
+
+    # (2) 시장 지표 (지수는 아침/저녁 모두 확인)
     print("시장 지표 수집 중...")
     bot_message += get_market_indices()
 
-    # (3) 개별 주식 정보
+    # (3) 개별 주식 정보 (핵심 수정 부분)
     print("주식 정보 수집 중...")
-    bot_message += "📊 *관심 종목 현황*\n"
+    if is_evening_mode:
+        bot_message += "🔥 *프리장(Pre-market) 현황*\n"
+    else:
+        bot_message += "📊 *종가(Close) 현황*\n"
     
     for ticker in tickers:
         try:
             stock = yf.Ticker(ticker)
-            hist = stock.history(period="2d")
             
-            if len(hist) >= 1:
-                close_price = hist['Close'].iloc[-1]
+            # [중요] 프리장 데이터를 위해 prepost=True, 최근 흐름을 위해 interval='1m' 사용
+            # 저녁(프리장)엔 1분봉으로 최신가 조회, 아침엔 일봉으로 마감가 조회
+            if is_evening_mode:
+                # 최근 1일치 1분봉 (프리장 포함)
+                hist = stock.history(period="1d", interval="1m", prepost=True)
+            else:
+                # 최근 2일치 일봉 (정규장 마감 기준)
+                hist = stock.history(period="2d")
+            
+            if not hist.empty:
+                # 가장 최근 가격 (프리장 현재가 or 어제 종가)
+                current_price = hist['Close'].iloc[-1]
                 
-                if len(hist) >= 2:
-                    prev_close = hist['Close'].iloc[-2]
-                    change = ((close_price - prev_close) / prev_close) * 100
-                    
-                    if change > 0: emoji = "🔺" 
-                    elif change < 0: emoji = "💙"
-                    else: emoji = "➖"
-
-                    bot_message += f"{emoji} {ticker}: ${close_price:.2f} ({change:+.2f}%)\n"
+                # 변동률 계산을 위한 기준가 설정
+                # 프리장 모드일 땐: '전일 정규장 종가' 기준 (yfinance info 활용)
+                # 아침 모드일 땐: '그 전날 종가' 기준
+                
+                prev_close = 0
+                if is_evening_mode:
+                    # info에서 전일 종가 가져오기 (가끔 실패할 수 있어 예외처리)
+                    try:
+                        prev_close = stock.info.get('previousClose', hist['Close'].iloc[0])
+                    except:
+                        prev_close = hist['Close'].iloc[0] # 실패 시 시가로 대체
                 else:
-                    bot_message += f"➖ {ticker}: ${close_price:.2f}\n"
+                    if len(hist) >= 2:
+                        prev_close = hist['Close'].iloc[-2]
+                    else:
+                        prev_close = current_price # 비교 불가 시 0% 처리
+
+                # 변동률 계산
+                if prev_close > 0:
+                    change = ((current_price - prev_close) / prev_close) * 100
+                else:
+                    change = 0.0
+
+                # 이모지 처리
+                if change > 0: emoji = "🔺" 
+                elif change < 0: emoji = "💙"
+                else: emoji = "➖"
+
+                bot_message += f"{emoji} {ticker}: ${current_price:.2f} ({change:+.2f}%)\n"
             else:
                 bot_message += f"⚠️ {ticker}: 데이터 없음\n"
                 
-        except:
+        except Exception as e:
+            # print(e) # 디버깅용
             bot_message += f"⚠️ {ticker}: 확인 불가\n"
         
-        time.sleep(0.5)
+        # API 호출 제한 방지 딜레이
+        time.sleep(0.2)
 
     # (4) 텔레그램 전송
     send_telegram_message(bot_message)
