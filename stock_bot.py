@@ -119,7 +119,38 @@ def get_fear_and_greed_index():
     except Exception as e:
         print(f"Error fetching F&G Index: {e}")
         return None, None
+# === [추가] 뉴스 및 실적 일정 가져오기 ===
+def get_stock_news_and_events(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        info_msg = ""
+        
+        # 1. 최신 뉴스 (가장 최근 1개만)
+        news_list = stock.news
+        if news_list:
+            latest = news_list[0] # 가장 최신 뉴스
+            title = latest.get('title', '제목 없음')
+            # link = latest.get('link', '') # 링크가 필요하면 주석 해제
+            
+            # 영문 제목을 그대로 출력하거나, 필요시 번역 API 연동 가능
+            # 여기서는 원문 제목 앞에 아이콘만 붙여서 보여줍니다.
+            info_msg += f"  📰 {title}\n"
 
+        # 2. 다음 실적 발표일 (Earnings Date)
+        # yfinance의 calendar는 딕셔너리를 반환하며 'Earnings Date' 키를 가짐
+        cal = stock.calendar
+        if cal and 'Earnings Date' in cal:
+            # 리스트로 나오므로 첫 번째 날짜 추출
+            earnings_dates = cal['Earnings Date']
+            if earnings_dates:
+                # 날짜 객체를 문자열로 변환 (YYYY-MM-DD)
+                next_earnings = earnings_dates[0].strftime("%Y-%m-%d")
+                info_msg += f"  📢 실적발표예정: {next_earnings}\n"
+        
+        return info_msg
+
+    except Exception as e:
+        return "" # 에러 나면 조용히 넘어감 (메시지 지저분해지는 것 방지)
 # === 5. 주식 종목 설정 ===
 tickers = ["SWKS","NVDA", "TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO", "AMZN", "NFLX", "GOOGL", "IONQ","PLTR","ETN", "TSM", "MU", "AXON","META"]
 
