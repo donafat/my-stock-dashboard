@@ -194,7 +194,11 @@ if __name__ == "__main__":
         bot_message += "😨 *CNN 공포/탐욕 지수*: 확인 실패\n------------------\n"
 
     # (4) 개별 주식 정보
-    print("주식 정보 수집 중...")
+print("주식 정보 수집 중...")
+    
+    # 📌 뉴스를 확인하고 싶은 핵심 종목 리스트 (원하는 종목만 넣으세요)
+    news_watch_list = ["NVDA", "LABU", "TSLA", "SOXL"]
+
     if is_evening_mode:
         bot_message += "🔥 *프리장(Pre-market) 현황*\n"
     else:
@@ -236,15 +240,23 @@ if __name__ == "__main__":
                 elif change < 0: emoji = "💙"
                 else: emoji = "➖"
 
-                bot_message += f"{emoji} {ticker}: ${current_price:.2f} ({change:+.2f}%)\n"
+                # 가격 정보 출력
+                bot_message += f"{emoji} *{ticker}*: ${current_price:.2f} ({change:+.2f}%)\n"
+
+                # === [추가된 부분] 뉴스 및 공시 정보 ===
+                if ticker in news_watch_list:
+                    extra_info = get_stock_news_and_events(ticker)
+                    if extra_info:
+                        bot_message += extra_info
+                        bot_message += "\n" # 가독성을 위해 한 줄 띄움
             else:
                 bot_message += f"⚠️ {ticker}: 데이터 없음\n"
                 
         except Exception as e:
             bot_message += f"⚠️ {ticker}: 확인 불가\n"
         
-        # API 호출 제한 방지
-        time.sleep(0.2)
+        # API 호출 제한 방지 (뉴스 조회 시간을 고려해 0.3초로 설정)
+        time.sleep(0.3)
 
     # (5) 텔레그램 전송
     print("최종 메시지 전송 중...")
