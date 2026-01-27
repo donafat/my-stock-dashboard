@@ -193,10 +193,10 @@ if __name__ == "__main__":
     else:
         bot_message += "😨 *CNN 공포/탐욕 지수*: 확인 실패\n------------------\n"
 
-    # (4) 개별 주식 정보
-print("주식 정보 수집 중...")
+  # (4) 개별 주식 정보
+    print("주식 정보 수집 중...")
     
-    # 📌 뉴스를 확인하고 싶은 핵심 종목 리스트 (원하는 종목만 넣으세요)
+    # [중요] 이 줄이 위쪽 print와 같은 라인에 있어야 합니다 (Space 4칸)
     news_watch_list = ["NVDA", "LABU", "TSLA", "SOXL"]
 
     if is_evening_mode:
@@ -243,19 +243,19 @@ print("주식 정보 수집 중...")
                 # 가격 정보 출력
                 bot_message += f"{emoji} *{ticker}*: ${current_price:.2f} ({change:+.2f}%)\n"
 
-                # === [추가된 부분] 뉴스 및 공시 정보 ===
+                # === 뉴스 및 공시 정보 ===
                 if ticker in news_watch_list:
                     extra_info = get_stock_news_and_events(ticker)
                     if extra_info:
                         bot_message += extra_info
-                        bot_message += "\n" # 가독성을 위해 한 줄 띄움
+                        bot_message += "\n"
             else:
                 bot_message += f"⚠️ {ticker}: 데이터 없음\n"
                 
         except Exception as e:
             bot_message += f"⚠️ {ticker}: 확인 불가\n"
         
-        # API 호출 제한 방지 (뉴스 조회 시간을 고려해 0.3초로 설정)
+        # API 호출 제한 방지
         time.sleep(0.3)
 
     # (5) 텔레그램 전송
