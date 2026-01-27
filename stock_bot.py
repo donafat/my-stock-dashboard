@@ -182,7 +182,39 @@ if __name__ == "__main__":
         
         # API 호출 제한 방지 딜레이
         time.sleep(0.2)
-
+######### CNN 공포탐욕지수 추가 ##############
+    def get_fear_and_greed_index():
+    url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        # 데이터 구조에서 최신 값 추출
+        fng_value = int(data['fear_and_greed']['score'])
+        fng_rating = data['fear_and_greed']['rating']
+        
+        # 등급 한글 변환 (선택 사항)
+        rating_kor = {
+            "extreme fear": "극도의 공포 🥶",
+            "fear": "공포 😨",
+            "neutral": "중립 😐",
+            "greed": "탐욕 🤑",
+            "extreme greed": "극도의 탐욕 🔥"
+        }
+        
+        rating_display = rating_kor.get(fng_rating, fng_rating)
+        
+        return fng_value, rating_display
+        
+    except Exception as e:
+        print(f"Error fetching F&G Index: {e}")
+        return None, None
+################ CNN공포탐욕지수 추가 끝#####################
     # (4) 텔레그램 전송
     send_telegram_message(bot_message)
     print("전송 완료")
