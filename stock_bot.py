@@ -159,7 +159,7 @@ def get_stock_news_and_events(ticker):
     except Exception as e:
         return "" # 에러 나면 조용히 넘어감 (메시지 지저분해지는 것 방지)
 # === 5. 주식 종목 설정 ===
-tickers = ["SWKS","NVDA", "TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO", "AMZN", "NFLX", "GOOGL", "IONQ","PLTR","ETN", "TSM", "MU", "AXON","META"]
+tickers = ["SWKS","NVDA","GOOGL","AMZN","TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO","NFLX","IONQ","PLTR","ETN", "TSM", "MU", "AXON","META"]
 
 # === 6. 메인 실행 로직 ===
 if __name__ == "__main__":
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     print("주식 정보 수집 중...")
     
     # [중요] 이 줄이 위쪽 print와 같은 라인에 있어야 합니다 (Space 4칸)
-    news_watch_list = ["NVDA", "AMZN", "TSLA", "GOOGL","SWKS"]
+    news_watch_list = ["SWKS","NVDA","GOOGL","AMZN","TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO","NFLX","IONQ","PLTR","ETN", "TSM", "MU", "AXON","META"]
 
     if is_evening_mode:
         bot_message += "🔥 *프리장(Pre-market) 현황*\n"
