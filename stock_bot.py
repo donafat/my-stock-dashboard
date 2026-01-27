@@ -23,9 +23,15 @@ def send_telegram_message(msg):
 
 # === 2. 날씨 정보 함수 ===
 def get_weather_forecast(location_eng, location_kor):
+    # 봇 차단 방지를 위한 사람 위장용 헤더
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    
     try:
         url = f"https://wttr.in/{location_eng}?format=j1&lang=ko"
-        response = requests.get(url, timeout=10)
+        # headers 옵션 추가
+        response = requests.get(url, headers=headers, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
@@ -43,8 +49,9 @@ def get_weather_forecast(location_eng, location_kor):
             result += f" 👉 [🔎 상세 날씨 보기]({link})"
             return result
         else:
-            return f"📍 {location_eng}: 정보 없음"
-    except:
+            return f"📍 {location_eng}: 정보 없음 (차단됨)"
+    except Exception as e:
+        print(f"날씨 오류: {e}") # 로그에서 원인 확인용
         return f"📍 {location_eng}: 연결 실패"
 
 # === 3. 시장 주요 지표 ===
