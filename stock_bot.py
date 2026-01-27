@@ -197,7 +197,7 @@ if __name__ == "__main__":
     print("주식 정보 수집 중...")
     
     # [중요] 이 줄이 위쪽 print와 같은 라인에 있어야 합니다 (Space 4칸)
-    news_watch_list = ["NVDA", "LABU", "TSLA", "SOXL"]
+    news_watch_list = ["NVDA", "AMZN", "TSLA", "GOOGL","SWKS"]
 
     if is_evening_mode:
         bot_message += "🔥 *프리장(Pre-market) 현황*\n"
