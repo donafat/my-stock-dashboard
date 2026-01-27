@@ -4,3 +4,4 @@ requests
 beautifulsoup4
 yfinance>=0.2.40
 pytz
+user_agent
