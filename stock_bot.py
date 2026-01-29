@@ -191,11 +191,11 @@ if __name__ == "__main__":
     
     # (1) 날씨 (아침에만 표시)
     # 프리장에서 받을수 있도록 오른쪽 삭제함 if not is_evening_mode:
-        print("날씨 정보 수집 중...")
-        bot_message += "🌤 *오늘의 날씨*\n"
-        bot_message += get_weather_forecast("Seongdong-gu", "성동구") + "\n"
-        bot_message += get_weather_forecast("Gangnam-gu", "대치동") + "\n"
-        bot_message += "------------------\n"
+    print("날씨 정보 수집 중...") # if 구문 삭제시 왼쪽으로 shift 해줌. 그래야 build 시 에러없음
+    bot_message += "🌤 *오늘의 날씨*\n" # if 구문 삭제시 왼쪽으로 shift 해줌. 그래야 build 시 에러없음
+    bot_message += get_weather_forecast("Seongdong-gu", "성동구") + "\n" # if 구문 삭제시 왼쪽으로 shift 해줌. 그래야 build 시 에러없음
+    bot_message += get_weather_forecast("Gangnam-gu", "대치동") + "\n" # if 구문 삭제시 왼쪽으로 shift 해줌. 그래야 build 시 에러없음
+    bot_message += "------------------\n"
 
     # (2) 시장 지표
     print("시장 지표 수집 중...")
