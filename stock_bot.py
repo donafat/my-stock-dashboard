@@ -190,7 +190,7 @@ if __name__ == "__main__":
     bot_message = f"{title}\n📅 {current_time_str}\n------------------\n"
     
     # (1) 날씨 (아침에만 표시)
-    if not is_evening_mode:
+    # 프리장에서 받을수 있도록 오른쪽 삭제함 if not is_evening_mode:
         print("날씨 정보 수집 중...")
         bot_message += "🌤 *오늘의 날씨*\n"
         bot_message += get_weather_forecast("Seongdong-gu", "성동구") + "\n"
