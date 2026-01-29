@@ -159,7 +159,7 @@ def get_stock_news_and_events(ticker):
     except Exception as e:
         return "" # 에러 나면 조용히 넘어감 (메시지 지저분해지는 것 방지)
 # === 5. 주식 종목 설정 ===
-tickers = ["SWKS","NVDA","GOOGL","AMZN","TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO","NFLX","IONQ","PLTR","ETN", "TSM", "MU", "AXON","META"]
+tickers = ["SWKS","NVDA","GOOGL","AMZN","TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO","NFLX","IONQ","PLTR","ETN", "TSM", "MU", "AXON","META","BTC-USD", "ETH-USD"]
 
 # === 6. 메인 실행 로직 ===
 if __name__ == "__main__":
