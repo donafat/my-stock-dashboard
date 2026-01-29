@@ -28,31 +28,42 @@ def get_weather_forecast(location_eng, location_kor):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
     
-    try:
-        url = f"https://wttr.in/{location_eng}?format=j1&lang=ko"
-        # headers 옵션 추가
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            weather_today = data['weather'][0]['hourly']
+    url = f"https://wttr.in/{location_eng}?format=j1&lang=ko"
+    max_retries = 3  # 최대 재시도 횟수 설정
+
+    for attempt in range(max_retries):
+        try:
+            # timeout을 10초로 유지 (충분함)
+            response = requests.get(url, headers=headers, timeout=10)
             
-            # 현재 시간대에 맞는 예보 (오전/오후 단순화)
-            am_data = weather_today[3] # 09:00
-            pm_data = weather_today[6] # 18:00
+            if response.status_code == 200:
+                data = response.json()
+                weather_today = data['weather'][0]['hourly']
+                
+                # 현재 시간대에 맞는 예보 (오전/오후 단순화)
+                am_data = weather_today[3] # 09:00
+                pm_data = weather_today[6] # 18:00
+                
+                result = f"📍 *{location_eng}* ({location_kor})\n"
+                result += f" - 오전/오후 기온: {am_data['tempC']}°C / {pm_data['tempC']}°C\n"
+                result += f" - 상태: {pm_data['lang_ko'][0]['value']}\n"
+                
+                link = f"https://search.naver.com/search.naver?query={location_kor}+날씨"
+                result += f" 👉 [🔎 상세 날씨 보기]({link})"
+                return result
             
-            result = f"📍 *{location_eng}* ({location_kor})\n"
-            result += f" - 오전/오후 기온: {am_data['tempC']}°C / {pm_data['tempC']}°C\n"
-            result += f" - 상태: {pm_data['lang_ko'][0]['value']}\n"
-            
-            link = f"https://search.naver.com/search.naver?query={location_kor}+날씨"
-            result += f" 👉 [🔎 상세 날씨 보기]({link})"
-            return result
-        else:
-            return f"📍 {location_eng}: 정보 없음 (차단됨)"
-    except Exception as e:
-        print(f"날씨 오류: {e}") # 로그에서 원인 확인용
-        return f"📍 {location_eng}: 연결 실패"
+            else:
+                # 200 OK가 아닐 경우 (예: 404, 500 등)
+                print(f"[{attempt+1}/{max_retries}] {location_kor} 응답 코드 오류: {response.status_code}. 재시도 중...")
+                time.sleep(2) # 2초 대기 후 재시도
+                
+        except Exception as e:
+            # 연결 에러 발생 시
+            print(f"[{attempt+1}/{max_retries}] {location_kor} 연결 실패: {e}. 2초 후 재시도...")
+            time.sleep(2) # 2초 대기 후 재시도
+
+    # 3번 다 실패했을 경우 최종적으로 반환할 메시지
+    return f"📍 {location_eng}: 정보 없음 (3회 연결 실패)"
 
 # === 3. 시장 주요 지표 ===
 def get_market_indices():
