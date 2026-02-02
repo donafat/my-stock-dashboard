@@ -4,6 +4,7 @@ import yfinance as yf
 from datetime import datetime
 import pytz
 import time
+import FinanceDataReader as fdr
 
 # === 1. 텔레그램 전송 함수 ===
 def send_telegram_message(msg):
@@ -275,7 +276,59 @@ if __name__ == "__main__":
         
         # API 호출 제한 방지
         time.sleep(0.3)
-
+#원자재(금,은,구리 시세추가 2026-02-02)
+    def get_commodity_price():
+    # 1. 가져올 원자재 목록 정의
+    commodities = {
+        '금 (Gold)': 'GC=F',
+        '은 (Silver)': 'SI=F',
+        '구리 (Copper)': 'HG=F'
+    }
+    
+    # 2. 결과 메시지 만들기
+    report = "\n⛏️ [원자재 주요 시세]\n"
+    
+    # 날짜 설정 (최근 데이터 확보를 위해 넉넉히 일주일 전부터 조회)
+    end_date = datetime.datetime.now()
+    start_date = end_date - datetime.timedelta(days=7)
+    
+    for name, ticker in commodities.items():
+        try:
+            # 데이터 조회
+            df = fdr.DataReader(ticker, start_date, end_date)
+            
+            if not df.empty:
+                # 최신 종가와 전일 대비 등락률 계산
+                last_close = df['Close'].iloc[-1]
+                
+                # 전일 데이터가 있다면 등락률 계산
+                if len(df) >= 2:
+                    prev_close = df['Close'].iloc[-2]
+                    change = last_close - prev_close
+                    pct_change = (change / prev_close) * 100
+                    emoji = "🔺" if change > 0 else "blue_circle" if change == 0 else "blue_heart" # 파란하트가 하락
+                    if change < 0: emoji = "📉" # 하락 이모지 변경
+                    
+                    report += f"{name}: ${last_close:,.2f} ({emoji} {pct_change:.2f}%)\n"
+                else:
+                    report += f"{name}: ${last_close:,.2f}\n"
+            else:
+                report += f"{name}: 데이터 조회 실패\n"
+                
+        except Exception as e:
+            report += f"{name}: 정보 없음 ({str(e)})\n"
+            
+    return report
+    stock_message = "기존 주식 정보...\n" 
+    
+    # [추가됨] 원자재 정보 가져오기
+    commodity_message = get_commodity_price()
+    
+    # 메시지 합치기
+    final_message = stock_message + commodity_message
+    
+    print(final_message) # 확인용 출력
+    # send_telegram(final_message) # 텔레그램 전송
     # (5) 텔레그램 전송
     print("최종 메시지 전송 중...")
     send_telegram_message(bot_message)
