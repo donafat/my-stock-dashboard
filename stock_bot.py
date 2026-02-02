@@ -4,7 +4,7 @@ import requests
 import pytz
 import yfinance as yf
 import FinanceDataReader as fdr
-from datetime import datetime, timedelta  # <--- 여기에 timedelta를 추가했습니다!
+from datetime import datetime, timedelta
 
 # =========================================================
 # 1. 텔레그램 전송 함수
@@ -18,7 +18,7 @@ def send_telegram(message):
         return
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = {'chat_id': chat_id, 'text': message}
+    data = {'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'}
     
     try:
         response = requests.post(url, data=data)
@@ -30,7 +30,7 @@ def send_telegram(message):
         print(f"❌ 전송 중 에러: {e}")
 
 # =========================================================
-# 2. 날씨 정보 함수
+# 2. 날씨 정보 함수 (링크 복구됨!)
 # =========================================================
 def get_weather_forecast(location_eng, location_kor):
     headers = {
@@ -52,6 +52,11 @@ def get_weather_forecast(location_eng, location_kor):
                 result = f"📍 *{location_eng}* ({location_kor})\n"
                 result += f" - 기온: {am_data['tempC']}°C / {pm_data['tempC']}°C\n"
                 result += f" - 상태: {pm_data['lang_ko'][0]['value']}\n"
+                
+                # [복구된 부분] 네이버 상세 날씨 링크
+                link = f"https://search.naver.com/search.naver?query={location_kor}+날씨"
+                result += f" 👉 [🔎 상세 날씨 보기]({link})"
+                
                 return result
             else:
                 time.sleep(1)
@@ -135,6 +140,8 @@ def get_stock_news_and_events(ticker):
         news_list = stock.news
         if news_list:
             title = news_list[0].get('title', '제목 없음')
+            # 텔레그램 마크다운 특수문자 충돌 방지
+            title = title.replace('[', '(').replace(']', ')')
             info_msg += f"  📰 {title}\n"
 
         # 실적발표
@@ -161,7 +168,6 @@ def get_commodity_price():
     
     report = "⛏️ *[원자재 주요 시세]*\n"
     
-    # [수정됨] pytz.timedelta -> timedelta 로 변경
     end_date = datetime.now()
     start_date = end_date - timedelta(days=7) 
     
