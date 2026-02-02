@@ -1,22 +1,20 @@
 import os
-import requests
-import yfinance as yf
-from datetime import datetime
-import pytz
 import time
+import requests
+import pytz
+import yfinance as yf
 import FinanceDataReader as fdr
+from datetime import datetime
 
-# === 1. 텔레그램 전송 함수 ===
-# 1. 텔레그램 전송 함수 정의 (반드시 실행 코드보다 위에 있어야 함)
+# =========================================================
+# 1. 텔레그램 전송 함수
+# =========================================================
 def send_telegram(message):
-    import requests
-    import os
-    
     token = os.environ.get('TELEGRAM_TOKEN')
     chat_id = os.environ.get('CHAT_ID')
     
     if not token or not chat_id:
-        print("❌ [오류] 텔레그램 설정을 찾을 수 없습니다.")
+        print("❌ [오류] 텔레그램 설정(TOKEN/CHAT_ID)을 찾을 수 없습니다.")
         return
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
@@ -31,87 +29,44 @@ def send_telegram(message):
     except Exception as e:
         print(f"❌ 전송 중 에러: {e}")
 
-# 2. 메인 실행부
-if __name__ == "__main__":
-    print("\n🚀 봇 실행 시작 (메시지 통합 중...)")
-    
-    # [중요] 기존에 수집한 정보가 있다면 변수명을 맞춰주세요.
-    # 보통 위쪽 코드에서 'message' 또는 'result_message' 같은 변수에 담겨있을 겁니다.
-    # 만약 변수명을 모른다면, 일단 빈 문자열로 시작합니다.
-    final_message = ""
-    
-    try:
-        # (A) 여기에 기존 주식/날씨 정보를 담는 코드가 있어야 합니다.
-        # 예: stock_message = get_stock_info() 
-        # 선생님 코드의 윗부분에서 이미 실행되어 출력된 내용들을 담아야 합니다.
-        # 혹시 위에서 'message'라는 변수에 담아두셨다면 아래 주석을 풀어주세요.
-        # final_message += message + "\n"
-        
-        # (B) 원자재 시세 추가
-        print("⛏️ 원자재 시세 가져오는 중...")
-        commodity_msg = get_commodity_price()
-        final_message += commodity_msg
-        
-        # (C) 최종 메시지 확인 및 전송
-        print("--- [최종 전송 메시지] ---")
-        print(final_message)
-        print("--------------------------")
-        
-        send_telegram(final_message)
-        
-    except Exception as e:
-        print(f"❌ 실행 중 치명적 오류: {e}")
-# === 2. 날씨 정보 함수 ===
+# =========================================================
+# 2. 날씨 정보 함수
+# =========================================================
 def get_weather_forecast(location_eng, location_kor):
-    # 봇 차단 방지를 위한 사람 위장용 헤더
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        "User-Agent": "Mozilla/5.0"
     }
-    
     url = f"https://wttr.in/{location_eng}?format=j1&lang=ko"
-    max_retries = 3  # 최대 재시도 횟수 설정
-
-    for attempt in range(max_retries):
+    
+    for attempt in range(3):
         try:
-            # timeout을 10초로 유지 (충분함)
             response = requests.get(url, headers=headers, timeout=10)
-            
             if response.status_code == 200:
                 data = response.json()
                 weather_today = data['weather'][0]['hourly']
-                
-                # 현재 시간대에 맞는 예보 (오전/오후 단순화)
                 am_data = weather_today[3] # 09:00
                 pm_data = weather_today[6] # 18:00
                 
                 result = f"📍 *{location_eng}* ({location_kor})\n"
-                result += f" - 오전/오후 기온: {am_data['tempC']}°C / {pm_data['tempC']}°C\n"
+                result += f" - 기온: {am_data['tempC']}°C / {pm_data['tempC']}°C\n"
                 result += f" - 상태: {pm_data['lang_ko'][0]['value']}\n"
-                
-                link = f"https://search.naver.com/search.naver?query={location_kor}+날씨"
-                result += f" 👉 [🔎 상세 날씨 보기]({link})"
                 return result
-            
             else:
-                # 200 OK가 아닐 경우 (예: 404, 500 등)
-                print(f"[{attempt+1}/{max_retries}] {location_kor} 응답 코드 오류: {response.status_code}. 재시도 중...")
-                time.sleep(2) # 2초 대기 후 재시도
-                
-        except Exception as e:
-            # 연결 에러 발생 시
-            print(f"[{attempt+1}/{max_retries}] {location_kor} 연결 실패: {e}. 2초 후 재시도...")
-            time.sleep(2) # 2초 대기 후 재시도
+                time.sleep(1)
+        except Exception:
+            time.sleep(1)
+            
+    return f"📍 {location_eng}: 정보 없음"
 
-    # 3번 다 실패했을 경우 최종적으로 반환할 메시지
-    return f"📍 {location_eng}: 정보 없음 (3회 연결 실패)"
-
-# === 3. 시장 주요 지표 ===
+# =========================================================
+# 3. 시장 주요 지표
+# =========================================================
 def get_market_indices():
     msg = ""
     indices = {
-        "💵 환율 (USD/KRW)": "KRW=X",
+        "💵 환율": "KRW=X",
         "🇰🇷 코스피": "^KS11",
-        "🇺🇸 S&P 500": "^GSPC",
+        "🇺🇸 S&P500": "^GSPC",
         "💻 나스닥": "^IXIC",
         "😱 공포지수": "^VIX"
     }
@@ -119,7 +74,6 @@ def get_market_indices():
     msg += "🌎 *글로벌 시장 지표*\n"
     for name, ticker in indices.items():
         try:
-            # 시장 지표는 5일치 일별 데이터 사용
             stock = yf.Ticker(ticker)
             hist = stock.history(period="5d")
             
@@ -146,192 +100,68 @@ def get_market_indices():
             
     return msg + "------------------\n"
 
-# === 4. CNN 공포탐욕지수 (새로 추가됨) ===
+# =========================================================
+# 4. CNN 공포/탐욕 지수
+# =========================================================
 def get_fear_and_greed_index():
     url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
+    headers = {"User-Agent": "Mozilla/5.0"}
     
     try:
         response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
         data = response.json()
-        
-        # 데이터 구조에서 최신 값 추출
         fng_value = int(data['fear_and_greed']['score'])
         fng_rating = data['fear_and_greed']['rating']
         
-        # 등급 한글 변환
         rating_kor = {
-            "extreme fear": "극도의 공포 🥶",
-            "fear": "공포 😨",
-            "neutral": "중립 😐",
-            "greed": "탐욕 🤑",
-            "extreme greed": "극도의 탐욕 🔥"
+            "extreme fear": "극도의 공포 🥶", "fear": "공포 😨",
+            "neutral": "중립 😐", "greed": "탐욕 🤑", "extreme greed": "극도의 탐욕 🔥"
         }
-        
-        rating_display = rating_kor.get(fng_rating, fng_rating)
-        return fng_value, rating_display
-        
-    except Exception as e:
-        print(f"Error fetching F&G Index: {e}")
+        return fng_value, rating_kor.get(fng_rating, fng_rating)
+    except:
         return None, None
-# === [추가] 뉴스 및 실적 일정 가져오기 ===
+
+# =========================================================
+# 5. 주식 뉴스 및 일정
+# =========================================================
 def get_stock_news_and_events(ticker):
     try:
         stock = yf.Ticker(ticker)
         info_msg = ""
         
-        # 1. 최신 뉴스 (가장 최근 1개만)
+        # 뉴스
         news_list = stock.news
         if news_list:
-            latest = news_list[0] # 가장 최신 뉴스
-            title = latest.get('title', '제목 없음')
-            # link = latest.get('link', '') # 링크가 필요하면 주석 해제
-            
-            # 영문 제목을 그대로 출력하거나, 필요시 번역 API 연동 가능
-            # 여기서는 원문 제목 앞에 아이콘만 붙여서 보여줍니다.
+            title = news_list[0].get('title', '제목 없음')
             info_msg += f"  📰 {title}\n"
 
-        # 2. 다음 실적 발표일 (Earnings Date)
-        # yfinance의 calendar는 딕셔너리를 반환하며 'Earnings Date' 키를 가짐
+        # 실적발표
         cal = stock.calendar
         if cal and 'Earnings Date' in cal:
-            # 리스트로 나오므로 첫 번째 날짜 추출
             earnings_dates = cal['Earnings Date']
             if earnings_dates:
-                # 날짜 객체를 문자열로 변환 (YYYY-MM-DD)
                 next_earnings = earnings_dates[0].strftime("%Y-%m-%d")
-                info_msg += f"  📢 실적발표예정: {next_earnings}\n"
+                info_msg += f"  📢 실적발표: {next_earnings}\n"
         
         return info_msg
+    except:
+        return ""
 
-    except Exception as e:
-        return "" # 에러 나면 조용히 넘어감 (메시지 지저분해지는 것 방지)
-# === 5. 주식 종목 설정 ===
-tickers = ["SWKS","NVDA","GOOGL","AMZN","TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO","NFLX","IONQ","PLTR","ETN", "TSM", "MU", "AXON","META","BTC-USD", "ETH-USD"]
-
-# === 6. 메인 실행 로직 ===
-if __name__ == "__main__":
-    # 한국 시간 가져오기
-    kst = pytz.timezone('Asia/Seoul')
-    now = datetime.now(kst)
-    current_time_str = now.strftime("%Y-%m-%d %H:%M")
-    
-    # 오후 2시 이후면 '저녁 프리장 체크' 모드
-    is_evening_mode = now.hour >= 14 
-    
-    if is_evening_mode:
-        title = "🌙 *[미국주식 프리장 체크]*"
-    else:
-        title = "📈 *[맷투자 모닝 브리핑]*"
-
-    bot_message = f"{title}\n📅 {current_time_str}\n------------------\n"
-    
-    # (1) 날씨 (아침에만 표시)
-    # 프리장에서 받을수 있도록 오른쪽 삭제함 if not is_evening_mode:
-    print("날씨 정보 수집 중...") # if 구문 삭제시 왼쪽으로 shift 해줌. 그래야 build 시 에러없음
-    bot_message += "🌤 *오늘의 날씨*\n" # if 구문 삭제시 왼쪽으로 shift 해줌. 그래야 build 시 에러없음
-    bot_message += get_weather_forecast("Seongdong-gu", "성동구") + "\n" # if 구문 삭제시 왼쪽으로 shift 해줌. 그래야 build 시 에러없음
-    bot_message += get_weather_forecast("Gangnam-gu", "대치동") + "\n" # if 구문 삭제시 왼쪽으로 shift 해줌. 그래야 build 시 에러없음
-    bot_message += "------------------\n"
-
-    # (2) 시장 지표
-    print("시장 지표 수집 중...")
-    bot_message += get_market_indices()
-    
-    # (3) CNN 공포/탐욕 지수 추가 (여기가 핵심!)
-    print("CNN 공포탐욕지수 수집 중...")
-    fng_score, fng_rating = get_fear_and_greed_index()
-    if fng_score is not None:
-        bot_message += f"😨 *CNN 공포/탐욕 지수*\n"
-        bot_message += f"점수: *{fng_score}* / 상태: *{fng_rating}*\n"
-        bot_message += "------------------\n"
-    else:
-        bot_message += "😨 *CNN 공포/탐욕 지수*: 확인 실패\n------------------\n"
-
-  # (4) 개별 주식 정보
-    print("주식 정보 수집 중...")
-    
-    # [중요] 이 줄이 위쪽 print와 같은 라인에 있어야 합니다 (Space 4칸)
-    news_watch_list = ["SWKS","NVDA","GOOGL","AMZN","TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO","NFLX","IONQ","PLTR","ETN", "TSM", "MU", "AXON","META"]
-
-    if is_evening_mode:
-        bot_message += "🔥 *프리장(Pre-market) 현황*\n"
-    else:
-        bot_message += "📊 *종가(Close) 현황*\n"
-    
-    for ticker in tickers:
-        try:
-            stock = yf.Ticker(ticker)
-            
-            # 저녁(프리장)엔 1분봉, 아침엔 일봉
-            if is_evening_mode:
-                hist = stock.history(period="1d", interval="1m", prepost=True)
-            else:
-                hist = stock.history(period="2d")
-            
-            if not hist.empty:
-                current_price = hist['Close'].iloc[-1]
-                
-                prev_close = 0
-                if is_evening_mode:
-                    try:
-                        prev_close = stock.info.get('previousClose', hist['Close'].iloc[0])
-                    except:
-                        prev_close = hist['Close'].iloc[0]
-                else:
-                    if len(hist) >= 2:
-                        prev_close = hist['Close'].iloc[-2]
-                    else:
-                        prev_close = current_price
-
-                # 변동률 계산
-                if prev_close > 0:
-                    change = ((current_price - prev_close) / prev_close) * 100
-                else:
-                    change = 0.0
-
-                # 이모지 처리
-                if change > 0: emoji = "🔺" 
-                elif change < 0: emoji = "💙"
-                else: emoji = "➖"
-
-                # 가격 정보 출력
-                bot_message += f"{emoji} *{ticker}*: ${current_price:.2f} ({change:+.2f}%)\n"
-
-                # === 뉴스 및 공시 정보 ===
-                if ticker in news_watch_list:
-                    extra_info = get_stock_news_and_events(ticker)
-                    if extra_info:
-                        bot_message += extra_info
-                        bot_message += "\n"
-            else:
-                bot_message += f"⚠️ {ticker}: 데이터 없음\n"
-                
-        except Exception as e:
-            bot_message += f"⚠️ {ticker}: 확인 불가\n"
-        
-        # API 호출 제한 방지
-        time.sleep(0.3)
-#원자재(금,은,구리 시세추가 2026-02-02)
+# =========================================================
+# 6. 원자재 시세 (금, 은, 구리)
+# =========================================================
 def get_commodity_price():
-    # [수정 핵심] datetime 모듈을 dt라는 이름으로 새로 불러와서 충돌을 막습니다.
-    import datetime as dt
-    import FinanceDataReader as fdr
-    
     commodities = {
         '금 (Gold)': 'GC=F',
         '은 (Silver)': 'SI=F',
         '구리 (Copper)': 'HG=F'
     }
     
-    report = "\n⛏️ [원자재 주요 시세]\n"
+    report = "⛏️ *[원자재 주요 시세]*\n"
     
-    # dt를 사용해서 날짜를 계산합니다.
-    end_date = dt.datetime.now()
-    start_date = end_date - dt.timedelta(days=7)
+    # 최근 7일치 데이터 조회
+    end_date = datetime.now()
+    start_date = end_date - pytz.timedelta(days=7)
     
     for name, ticker in commodities.items():
         try:
@@ -345,58 +175,91 @@ def get_commodity_price():
                     change = last_close - prev_close
                     pct_change = (change / prev_close) * 100
                     
-                    emoji = "🔺" if change > 0 else "🔵" if change == 0 else "💙"
-                    if change < 0: emoji = "📉"
-                    
-                    report += f"{name}: ${last_close:,.2f} ({emoji} {pct_change:.2f}%)\n"
+                    emoji = "🔺" if change > 0 else "💙" if change < 0 else "➖"
+                    report += f"- {name}: ${last_close:,.2f} ({emoji} {pct_change:.2f}%)\n"
                 else:
-                    report += f"{name}: ${last_close:,.2f}\n"
+                    report += f"- {name}: ${last_close:,.2f}\n"
             else:
-                report += f"{name}: 데이터 조회 실패\n"
+                report += f"- {name}: 데이터 없음\n"
                 
-        except Exception as e:
-            report += f"{name}: 정보 없음\n"
+        except Exception:
+            report += f"- {name}: 정보 없음\n"
             
-    return report
-    stock_message = "기존 주식 정보...\n" 
-    
-    # [추가됨] 원자재 정보 가져오기
-    commodity_message = get_commodity_price()
-    
-    # 메시지 합치기
+    return report + "------------------\n"
+
+# =========================================================
+# [최종] 메인 실행 로직
+# =========================================================
 if __name__ == "__main__":
-    print("🚀 봇 실행 시작!")
+    print("🚀 봇 실행 시작 (데이터 수집 중...)")
     
+    # 1. 시간 설정
+    kst = pytz.timezone('Asia/Seoul')
+    now = datetime.now(kst)
+    current_time_str = now.strftime("%Y-%m-%d %H:%M")
+    is_evening_mode = now.hour >= 14
+    
+    title = "🌙 *[미국주식 프리장 체크]*" if is_evening_mode else "📈 *[맷투자 모닝 브리핑]*"
+    bot_message = f"{title}\n📅 {current_time_str}\n------------------\n"
+    
+    # 2. 날씨 (오류 방지를 위해 try-except)
     try:
-        # 1. 기존 주식/날씨 정보 가져오기 (함수 이름 확인 필요!)
-        # (선생님 코드에 있는 함수 이름으로 맞춰주세요. 보통 get_data() 또는 main_job() 등일 수 있습니다)
-        # 예시로 'get_stock_data()'라고 가정합니다. 만약 오류가 나면 기존 코드의 함수명을 확인하세요.
-        # stock_message = get_stock_data() 
-        
-        # [중요] 만약 기존 코드가 함수로 분리 안 되어 있고 쭉 써진 형태라면,
-        # 위쪽에서 만든 메시지 변수(예: message)를 그대로 쓰시면 됩니다.
-        
-        # 2. 원자재 시세 가져오기 (방금 만든 함수)
-        print("⛏️ 원자재 시세 조회 중...")
-        commodity_message = get_commodity_price()
-        
-        # 3. 메시지 합치기
-        # (기존 메시지가 message 변수에 담겨있다고 가정)
-        # 만약 기존 코드가 'message'라는 변수에 내용을 담고 있다면 아래처럼 합치세요.
-        # final_message = message + "\n" + commodity_message
-        
-        # [임시 조치] 일단 원자재 메시지라도 오는지 확인해봅시다.
-        final_message = commodity_message 
-        
-        # 4. 결과 출력 (로그 확인용)
-        print("--- 전송할 메시지 미리보기 ---")
-        print(final_message)
-        print("------------------------------")
-        
-        # 5. 텔레그램 전송
-        print("📨 텔레그램 전송 시도...")
-        send_telegram(final_message)
-        print("✅ 전송 완료!")
-        
+        print("1. 날씨 수집 중...")
+        bot_message += "🌤 *오늘의 날씨*\n"
+        bot_message += get_weather_forecast("Seongdong-gu", "성동구") + "\n"
+        bot_message += get_weather_forecast("Gangnam-gu", "대치동") + "\n"
+        bot_message += "------------------\n"
     except Exception as e:
-        print(f"❌ 실행 중 오류 발생: {e}")
+        print(f"날씨 에러: {e}")
+
+    # 3. 시장 지표
+    print("2. 시장 지표 수집 중...")
+    bot_message += get_market_indices()
+    
+    # 4. 공포탐욕지수
+    print("3. 공포지수 수집 중...")
+    fng_score, fng_rating = get_fear_and_greed_index()
+    if fng_score:
+        bot_message += f"😨 *CNN 공포/탐욕 지수*\n점수: *{fng_score}* / 상태: *{fng_rating}*\n------------------\n"
+    
+    # 5. 원자재 (여기에 추가!)
+    print("4. 원자재 시세 수집 중...")
+    bot_message += get_commodity_price()
+
+    # 6. 개별 주식
+    print("5. 주식 정보 수집 중...")
+    tickers = ["SWKS","NVDA","GOOGL","AMZN","TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO","NFLX","IONQ","PLTR","ETN", "TSM", "MU", "AXON","META","BTC-USD", "ETH-USD"]
+    news_watch_list = ["SWKS","NVDA","GOOGL","AMZN","TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO","NFLX","IONQ","PLTR","ETN", "TSM", "MU", "AXON","META"]
+    
+    bot_message += "🔥 *프리장 현황*\n" if is_evening_mode else "📊 *종가 현황*\n"
+    
+    for ticker in tickers:
+        try:
+            stock = yf.Ticker(ticker)
+            if is_evening_mode:
+                hist = stock.history(period="1d", interval="1m", prepost=True)
+            else:
+                hist = stock.history(period="2d")
+            
+            if not hist.empty:
+                current_price = hist['Close'].iloc[-1]
+                prev_close = hist['Close'].iloc[0] if is_evening_mode else (hist['Close'].iloc[-2] if len(hist) >= 2 else current_price)
+                
+                change = ((current_price - prev_close) / prev_close) * 100 if prev_close > 0 else 0
+                emoji = "🔺" if change > 0 else "💙" if change < 0 else "➖"
+                
+                bot_message += f"{emoji} *{ticker}*: ${current_price:.2f} ({change:+.2f}%)\n"
+                
+                if ticker in news_watch_list:
+                    bot_message += get_stock_news_and_events(ticker)
+            else:
+                bot_message += f"⚠️ {ticker}: 데이터 없음\n"
+            time.sleep(0.2)
+        except:
+            bot_message += f"⚠️ {ticker}: 조회 실패\n"
+
+    # 7. 최종 전송
+    print("\n--- 전송될 메시지 ---")
+    print(bot_message)
+    print("--------------------")
+    send_telegram(bot_message)
