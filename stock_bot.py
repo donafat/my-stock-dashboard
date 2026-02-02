@@ -60,46 +60,65 @@ def get_weather_forecast(location_eng, location_kor):
     return f"📍 {location_eng}: 정보 없음"
 
 # =========================================================
-# 3. 시장 주요 지표 (수정됨: 코스피/환율 -> 네이버 소스 사용)
+# 3. 시장 주요 지표 (안전장치 추가됨)
 # =========================================================
 def get_market_indices():
     msg = "🌎 *글로벌 시장 지표*\n"
     
-    # [A] 한국 관련 (FinanceDataReader - 네이버 소스)
-    # KS11: 코스피, USD/KRW: 환율
-    kor_indices = {
-        "💵 환율": "USD/KRW",
-        "🇰🇷 코스피": "KS11"
-    }
+    # 1. 한국/환율 지표 (네이버 시도 -> 실패시 야후)
+    # 형식: [표시명, 네이버코드, 야후코드]
+    items = [
+        ["💵 환율", "USD/KRW", "KRW=X"],
+        ["🇰🇷 코스피", "KS11", "^KS11"]
+    ]
     
-    # 날짜 설정 (오늘 포함 최근 7일)
     end_date = datetime.now(pytz.timezone('Asia/Seoul'))
     start_date = end_date - timedelta(days=7)
     
-    for name, code in kor_indices.items():
+    for name, naver_code, yahoo_code in items:
+        price = 0
+        change_str = ""
+        success = False
+        
+        # [시도 1] 네이버 (FinanceDataReader)
         try:
-            # 네이버 금융 등에서 데이터 크롤링
-            df = fdr.DataReader(code, start_date, end_date)
+            df = fdr.DataReader(naver_code, start_date, end_date)
             if not df.empty:
-                curr = df['Close'].iloc[-1]
-                
-                # 변동률 계산
-                change_str = ""
+                price = df['Close'].iloc[-1]
                 if len(df) >= 2:
                     prev = df['Close'].iloc[-2]
-                    pct = ((curr - prev) / prev) * 100
+                    pct = ((price - prev) / prev) * 100
                     icon = "🔺" if pct > 0 else "💙" if pct < 0 else "➖"
                     change_str = f"({pct:+.2f}%) {icon}"
-                
-                # 소수점 처리 (환율은 소수점 2자리, 코스피는 정수 반올림이 보기 좋음)
-                if "환율" in name:
-                    msg += f"- {name}: {curr:,.2f}원 {change_str}\n"
-                else:
-                    msg += f"- {name}: {curr:,.0f} {change_str}\n"
+                success = True
         except:
+            pass # 네이버 실패하면 조용히 넘어감
+            
+        # [시도 2] 야후 (yfinance) - 네이버 실패 시 실행
+        if not success:
+            try:
+                stock = yf.Ticker(yahoo_code)
+                hist = stock.history(period="5d")
+                if not hist.empty:
+                    price = hist['Close'].iloc[-1]
+                    if len(hist) >= 2:
+                        prev = hist['Close'].iloc[-2]
+                        pct = ((price - prev) / prev) * 100
+                        icon = "🔺" if pct > 0 else "💙" if pct < 0 else "➖"
+                        change_str = f"({pct:+.2f}%) {icon}"
+                    success = True
+            except:
+                pass
+
+        if success:
+            if "환율" in name:
+                msg += f"- {name}: {price:,.2f}원 {change_str}\n"
+            else:
+                msg += f"- {name}: {price:,.0f} {change_str}\n"
+        else:
             msg += f"- {name}: 확인 불가\n"
 
-    # [B] 미국 관련 (yfinance - 미국 소스)
+    # 2. 미국 지표 (야후 전용)
     us_indices = {
         "🇺🇸 S&P500": "^GSPC",
         "💻 나스닥": "^IXIC",
@@ -109,22 +128,18 @@ def get_market_indices():
     for name, ticker in us_indices.items():
         try:
             stock = yf.Ticker(ticker)
-            # 5일치 데이터를 가져와서 비교
             hist = stock.history(period="5d")
             if len(hist) >= 1:
                 price = hist['Close'].iloc[-1]
                 change_str = ""
-                
                 if len(hist) >= 2:
                     prev = hist['Close'].iloc[-2]
                     change = ((price - prev) / prev) * 100
-                    
                     if "VIX" in name:
                         icon = "🔥" if change > 5 else "😌" if change < -5 else " "
                     else:
                         icon = "🔺" if change > 0 else "💙" if change < 0 else "➖"
                     change_str = f"({change:+.2f}%) {icon}"
-                    
                 msg += f"- {name}: {price:,.2f} {change_str}\n"
         except:
             msg += f"- {name}: 확인 불가\n"
@@ -226,7 +241,7 @@ if __name__ == "__main__":
         bot_message += "------------------\n"
     except: pass
 
-    # 2. 시장 지표 (여기서 fdr로 네이버 데이터 가져옴)
+    # 2. 시장 지표 (안전장치 적용됨)
     print("2. 시장 지표 수집 중...")
     bot_message += get_market_indices()
     
