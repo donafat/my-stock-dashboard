@@ -277,7 +277,9 @@ if __name__ == "__main__":
         # API 호출 제한 방지
         time.sleep(0.3)
 #원자재(금,은,구리 시세추가 2026-02-02)
-    def get_commodity_price():
+   def get_commodity_price():
+    # ▼ 여기부터는 def보다 안쪽으로 들어가 있어야 합니다 (스페이스 4칸)
+    
     # 1. 가져올 원자재 목록 정의
     commodities = {
         '금 (Gold)': 'GC=F',
@@ -288,7 +290,7 @@ if __name__ == "__main__":
     # 2. 결과 메시지 만들기
     report = "\n⛏️ [원자재 주요 시세]\n"
     
-    # 날짜 설정 (최근 데이터 확보를 위해 넉넉히 일주일 전부터 조회)
+    # 날짜 설정
     end_date = datetime.datetime.now()
     start_date = end_date - datetime.timedelta(days=7)
     
@@ -298,16 +300,16 @@ if __name__ == "__main__":
             df = fdr.DataReader(ticker, start_date, end_date)
             
             if not df.empty:
-                # 최신 종가와 전일 대비 등락률 계산
                 last_close = df['Close'].iloc[-1]
                 
-                # 전일 데이터가 있다면 등락률 계산
                 if len(df) >= 2:
                     prev_close = df['Close'].iloc[-2]
                     change = last_close - prev_close
                     pct_change = (change / prev_close) * 100
-                    emoji = "🔺" if change > 0 else "blue_circle" if change == 0 else "blue_heart" # 파란하트가 하락
-                    if change < 0: emoji = "📉" # 하락 이모지 변경
+                    
+                    # 이모지 설정
+                    emoji = "🔺" if change > 0 else "🔵" if change == 0 else "💙"
+                    if change < 0: emoji = "📉"
                     
                     report += f"{name}: ${last_close:,.2f} ({emoji} {pct_change:.2f}%)\n"
                 else:
