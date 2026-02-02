@@ -10,18 +10,23 @@ import FinanceDataReader as fdr
 def send_telegram_message(msg):
     token = os.environ.get('TELEGRAM_TOKEN')
     chat_id = os.environ.get('TELEGRAM_CHAT_ID')
-    if token and chat_id:
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        try:
-            requests.post(url, data={
-                'chat_id': chat_id, 
-                'text': msg, 
-                'parse_mode': 'Markdown',
-                'disable_web_page_preview': 'true'
-            })
-        except Exception as e:
-            print(f"전송 실패: {e}")
+ if not token or not chat_id:
+        print("❌ 오류: 텔레그램 토큰(TELEGRAM_TOKEN)이나 채팅 ID(CHAT_ID)를 찾을 수 없습니다.")
+        print("   GitHub 설정(Secrets)을 확인하거나, .yml 파일의 env 설정을 확인해주세요.")
+        return
 
+    # 메시지 전송 API 호출
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    data = {'chat_id': chat_id, 'text': message}
+    
+    try:
+        response = requests.post(url, data=data)
+        if response.status_code == 200:
+            print("✅ 텔레그램 메시지 전송 성공!")
+        else:
+            print(f"❌ 텔레그램 전송 실패 (코드 {response.status_code}): {response.text}")
+    except Exception as e:
+        print(f"❌ 전송 중 에러 발생: {e}")
 # === 2. 날씨 정보 함수 ===
 def get_weather_forecast(location_eng, location_kor):
     # 봇 차단 방지를 위한 사람 위장용 헤더
