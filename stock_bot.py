@@ -18,7 +18,8 @@ def send_telegram(message):
         return
 
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    data = {'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'}
+    # [수정] 링크 미리보기 끄기 (disable_web_page_preview=True) -> 메시지 깔끔하게
+    data = {'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown', 'disable_web_page_preview': 'true'}
     
     try:
         response = requests.post(url, data=data)
@@ -60,17 +61,13 @@ def get_weather_forecast(location_eng, location_kor):
     return f"📍 {location_eng}: 정보 없음"
 
 # =========================================================
-# 3. 시장 주요 지표 (안전장치 추가됨)
+# 3. 시장 주요 지표 (안전장치 포함)
 # =========================================================
 def get_market_indices():
     msg = "🌎 *글로벌 시장 지표*\n"
     
-    # 1. 한국/환율 지표 (네이버 시도 -> 실패시 야후)
-    # 형식: [표시명, 네이버코드, 야후코드]
-    items = [
-        ["💵 환율", "USD/KRW", "KRW=X"],
-        ["🇰🇷 코스피", "KS11", "^KS11"]
-    ]
+    # 한국/환율 (네이버 우선 -> 야후 백업)
+    items = [["💵 환율", "USD/KRW", "KRW=X"], ["🇰🇷 코스피", "KS11", "^KS11"]]
     
     end_date = datetime.now(pytz.timezone('Asia/Seoul'))
     start_date = end_date - timedelta(days=7)
@@ -80,7 +77,7 @@ def get_market_indices():
         change_str = ""
         success = False
         
-        # [시도 1] 네이버 (FinanceDataReader)
+        # 1. 네이버 시도
         try:
             df = fdr.DataReader(naver_code, start_date, end_date)
             if not df.empty:
@@ -91,10 +88,9 @@ def get_market_indices():
                     icon = "🔺" if pct > 0 else "💙" if pct < 0 else "➖"
                     change_str = f"({pct:+.2f}%) {icon}"
                 success = True
-        except:
-            pass # 네이버 실패하면 조용히 넘어감
+        except: pass
             
-        # [시도 2] 야후 (yfinance) - 네이버 실패 시 실행
+        # 2. 야후 시도
         if not success:
             try:
                 stock = yf.Ticker(yahoo_code)
@@ -107,24 +103,16 @@ def get_market_indices():
                         icon = "🔺" if pct > 0 else "💙" if pct < 0 else "➖"
                         change_str = f"({pct:+.2f}%) {icon}"
                     success = True
-            except:
-                pass
+            except: pass
 
         if success:
-            if "환율" in name:
-                msg += f"- {name}: {price:,.2f}원 {change_str}\n"
-            else:
-                msg += f"- {name}: {price:,.0f} {change_str}\n"
+            fmt = "{:,.2f}원" if "환율" in name else "{:,.0f}"
+            msg += f"- {name}: {fmt.format(price)} {change_str}\n"
         else:
             msg += f"- {name}: 확인 불가\n"
 
-    # 2. 미국 지표 (야후 전용)
-    us_indices = {
-        "🇺🇸 S&P500": "^GSPC",
-        "💻 나스닥": "^IXIC",
-        "😱 공포지수": "^VIX"
-    }
-    
+    # 미국 지표 (야후)
+    us_indices = {"🇺🇸 S&P500": "^GSPC", "💻 나스닥": "^IXIC", "😱 공포지수(VIX)": "^VIX"}
     for name, ticker in us_indices.items():
         try:
             stock = yf.Ticker(ticker)
@@ -135,6 +123,8 @@ def get_market_indices():
                 if len(hist) >= 2:
                     prev = hist['Close'].iloc[-2]
                     change = ((price - prev) / prev) * 100
+                    
+                    # VIX는 반대로 해석 (오르면 공포)
                     if "VIX" in name:
                         icon = "🔥" if change > 5 else "😌" if change < -5 else " "
                     else:
@@ -147,24 +137,31 @@ def get_market_indices():
     return msg + "------------------\n"
 
 # =========================================================
-# 4. CNN 공포/탐욕 지수
+# 4. CNN 공포/탐욕 지수 (수정됨: 실패 시 메시지 표시)
 # =========================================================
 def get_fear_and_greed_index():
+    # 헤더를 좀 더 진짜 브라우저처럼 설정
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
-    headers = {"User-Agent": "Mozilla/5.0"}
+    
     try:
         response = requests.get(url, headers=headers, timeout=10)
-        data = response.json()
-        score = int(data['fear_and_greed']['score'])
-        rating = data['fear_and_greed']['rating']
+        if response.status_code == 200:
+            data = response.json()
+            score = int(data['fear_and_greed']['score'])
+            rating = data['fear_and_greed']['rating']
+            
+            rating_kor = {
+                "extreme fear": "극도의 공포 🥶", "fear": "공포 😨",
+                "neutral": "중립 😐", "greed": "탐욕 🤑", "extreme greed": "극도의 탐욕 🔥"
+            }
+            return score, rating_kor.get(rating, rating)
+    except Exception as e:
+        print(f"CNN 접속 에러: {e}")
         
-        rating_kor = {
-            "extreme fear": "극도의 공포 🥶", "fear": "공포 😨",
-            "neutral": "중립 😐", "greed": "탐욕 🤑", "extreme greed": "극도의 탐욕 🔥"
-        }
-        return score, rating_kor.get(rating, rating)
-    except:
-        return None, None
+    return None, None
 
 # =========================================================
 # 5. 주식 뉴스 및 일정
@@ -173,7 +170,6 @@ def get_stock_news_and_events(ticker):
     try:
         stock = yf.Ticker(ticker)
         info_msg = ""
-        
         news_list = stock.news
         if news_list:
             title = news_list[0].get('title', '제목 없음')
@@ -187,8 +183,7 @@ def get_stock_news_and_events(ticker):
                 next_earnings = earnings_dates[0].strftime("%Y-%m-%d")
                 info_msg += f"  📢 실적발표: {next_earnings}\n"
         return info_msg
-    except:
-        return ""
+    except: return ""
 
 # =========================================================
 # 6. 원자재 시세
@@ -241,15 +236,21 @@ if __name__ == "__main__":
         bot_message += "------------------\n"
     except: pass
 
-    # 2. 시장 지표 (안전장치 적용됨)
+    # 2. 시장 지표
     print("2. 시장 지표 수집 중...")
     bot_message += get_market_indices()
     
-    # 3. 공포지수
+    # 3. 공포지수 (수정됨: 실패해도 메시지 표시)
     print("3. 공포지수 수집 중...")
     score, rating = get_fear_and_greed_index()
     if score:
-        bot_message += f"😨 *CNN 공포/탐욕 지수*\n점수: *{score}* / 상태: *{rating}*\n------------------\n"
+        bot_message += f"😨 *CNN 공포/탐욕 지수*\n점수: *{score}* / 상태: *{rating}*\n"
+    else:
+        # 실패 시 메시지 출력
+        bot_message += f"😨 *CNN 공포/탐욕 지수*: ⚠️ 수집 실패\n"
+    
+    # 링크는 성공/실패 상관없이 항상 표시
+    bot_message += "[👉 CNN 웹사이트 바로가기](https://edition.cnn.com/markets/fear-and-greed)\n------------------\n"
     
     # 4. 원자재
     print("4. 원자재 수집 중...")
@@ -265,7 +266,6 @@ if __name__ == "__main__":
     for ticker in tickers:
         try:
             stock = yf.Ticker(ticker)
-            # 프리장/정규장 구분
             if is_evening_mode:
                 hist = stock.history(period="1d", interval="1m", prepost=True)
             else:
@@ -273,7 +273,6 @@ if __name__ == "__main__":
             
             if not hist.empty:
                 curr = hist['Close'].iloc[-1]
-                # 등락률 기준점 설정
                 if is_evening_mode:
                     prev = stock.info.get('previousClose', hist['Close'].iloc[0])
                 else:
