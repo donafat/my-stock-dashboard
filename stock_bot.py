@@ -7,26 +7,60 @@ import time
 import FinanceDataReader as fdr
 
 # === 1. 텔레그램 전송 함수 ===
-def send_telegram_message(msg):
+# 1. 텔레그램 전송 함수 정의 (반드시 실행 코드보다 위에 있어야 함)
+def send_telegram(message):
+    import requests
+    import os
+    
     token = os.environ.get('TELEGRAM_TOKEN')
-    chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+    chat_id = os.environ.get('CHAT_ID')
+    
     if not token or not chat_id:
-        print("❌ 오류: 텔레그램 토큰(TELEGRAM_TOKEN)이나 채팅 ID(CHAT_ID)를 찾을 수 없습니다.")
-        print("   GitHub 설정(Secrets)을 확인하거나, .yml 파일의 env 설정을 확인해주세요.")
+        print("❌ [오류] 텔레그램 설정을 찾을 수 없습니다.")
         return
 
-    # 메시지 전송 API 호출
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     data = {'chat_id': chat_id, 'text': message}
     
     try:
         response = requests.post(url, data=data)
         if response.status_code == 200:
-            print("✅ 텔레그램 메시지 전송 성공!")
+            print("✅ 텔레그램 전송 성공!")
         else:
-            print(f"❌ 텔레그램 전송 실패 (코드 {response.status_code}): {response.text}")
+            print(f"❌ 전송 실패: {response.text}")
     except Exception as e:
-        print(f"❌ 전송 중 에러 발생: {e}")
+        print(f"❌ 전송 중 에러: {e}")
+
+# 2. 메인 실행부
+if __name__ == "__main__":
+    print("\n🚀 봇 실행 시작 (메시지 통합 중...)")
+    
+    # [중요] 기존에 수집한 정보가 있다면 변수명을 맞춰주세요.
+    # 보통 위쪽 코드에서 'message' 또는 'result_message' 같은 변수에 담겨있을 겁니다.
+    # 만약 변수명을 모른다면, 일단 빈 문자열로 시작합니다.
+    final_message = ""
+    
+    try:
+        # (A) 여기에 기존 주식/날씨 정보를 담는 코드가 있어야 합니다.
+        # 예: stock_message = get_stock_info() 
+        # 선생님 코드의 윗부분에서 이미 실행되어 출력된 내용들을 담아야 합니다.
+        # 혹시 위에서 'message'라는 변수에 담아두셨다면 아래 주석을 풀어주세요.
+        # final_message += message + "\n"
+        
+        # (B) 원자재 시세 추가
+        print("⛏️ 원자재 시세 가져오는 중...")
+        commodity_msg = get_commodity_price()
+        final_message += commodity_msg
+        
+        # (C) 최종 메시지 확인 및 전송
+        print("--- [최종 전송 메시지] ---")
+        print(final_message)
+        print("--------------------------")
+        
+        send_telegram(final_message)
+        
+    except Exception as e:
+        print(f"❌ 실행 중 치명적 오류: {e}")
 # === 2. 날씨 정보 함수 ===
 def get_weather_forecast(location_eng, location_kor):
     # 봇 차단 방지를 위한 사람 위장용 헤더
