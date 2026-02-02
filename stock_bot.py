@@ -277,7 +277,7 @@ if __name__ == "__main__":
         # API 호출 제한 방지
         time.sleep(0.3)
 #원자재(금,은,구리 시세추가 2026-02-02)
-   def get_commodity_price():
+def get_commodity_price():
     # ▼ 여기부터는 def보다 안쪽으로 들어가 있어야 합니다 (스페이스 4칸)
     
     # 1. 가져올 원자재 목록 정의
