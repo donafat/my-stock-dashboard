@@ -11,7 +11,7 @@ from datetime import datetime, timedelta  # <--- 여기에 timedelta를 추가�
 # =========================================================
 def send_telegram(message):
     token = os.environ.get('TELEGRAM_TOKEN')
-    chat_id = os.environ.get('CHAT_ID')
+    chat_id = os.environ.get('TELEGRAM_CHAT_ID')
     
     if not token or not chat_id:
         print("❌ [오류] 텔레그램 설정(TOKEN/CHAT_ID)을 찾을 수 없습니다.")
