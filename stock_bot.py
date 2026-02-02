@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 # =========================================================
 def send_telegram(message):
     token = os.environ.get('TELEGRAM_TOKEN')
-    chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+    chat_id = os.environ.get('CHAT_ID')
     
     if not token or not chat_id:
         print("❌ [오류] 텔레그램 설정(TOKEN/CHAT_ID)을 찾을 수 없습니다.")
@@ -30,12 +30,10 @@ def send_telegram(message):
         print(f"❌ 전송 중 에러: {e}")
 
 # =========================================================
-# 2. 날씨 정보 함수 (링크 복구됨!)
+# 2. 날씨 정보 함수
 # =========================================================
 def get_weather_forecast(location_eng, location_kor):
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
+    headers = {"User-Agent": "Mozilla/5.0"}
     url = f"https://wttr.in/{location_eng}?format=j1&lang=ko"
     
     for attempt in range(3):
@@ -45,45 +43,74 @@ def get_weather_forecast(location_eng, location_kor):
                 data = response.json()
                 weather_today = data['weather'][0]['hourly']
                 
-                # 시간대별 예보 (오전 9시, 오후 6시)
-                am_data = weather_today[3] 
-                pm_data = weather_today[6] 
+                am_data = weather_today[3] # 09:00
+                pm_data = weather_today[6] # 18:00
                 
                 result = f"📍 *{location_eng}* ({location_kor})\n"
                 result += f" - 기온: {am_data['tempC']}°C / {pm_data['tempC']}°C\n"
                 result += f" - 상태: {pm_data['lang_ko'][0]['value']}\n"
                 
-                # [복구된 부분] 네이버 상세 날씨 링크
                 link = f"https://search.naver.com/search.naver?query={location_kor}+날씨"
                 result += f" 👉 [🔎 상세 날씨 보기]({link})"
-                
                 return result
             else:
                 time.sleep(1)
-        except Exception:
+        except:
             time.sleep(1)
-            
     return f"📍 {location_eng}: 정보 없음"
 
 # =========================================================
-# 3. 시장 주요 지표
+# 3. 시장 주요 지표 (수정됨: 코스피/환율 -> 네이버 소스 사용)
 # =========================================================
 def get_market_indices():
-    msg = ""
-    indices = {
-        "💵 환율": "KRW=X",
-        "🇰🇷 코스피": "^KS11",
+    msg = "🌎 *글로벌 시장 지표*\n"
+    
+    # [A] 한국 관련 (FinanceDataReader - 네이버 소스)
+    # KS11: 코스피, USD/KRW: 환율
+    kor_indices = {
+        "💵 환율": "USD/KRW",
+        "🇰🇷 코스피": "KS11"
+    }
+    
+    # 날짜 설정 (오늘 포함 최근 7일)
+    end_date = datetime.now(pytz.timezone('Asia/Seoul'))
+    start_date = end_date - timedelta(days=7)
+    
+    for name, code in kor_indices.items():
+        try:
+            # 네이버 금융 등에서 데이터 크롤링
+            df = fdr.DataReader(code, start_date, end_date)
+            if not df.empty:
+                curr = df['Close'].iloc[-1]
+                
+                # 변동률 계산
+                change_str = ""
+                if len(df) >= 2:
+                    prev = df['Close'].iloc[-2]
+                    pct = ((curr - prev) / prev) * 100
+                    icon = "🔺" if pct > 0 else "💙" if pct < 0 else "➖"
+                    change_str = f"({pct:+.2f}%) {icon}"
+                
+                # 소수점 처리 (환율은 소수점 2자리, 코스피는 정수 반올림이 보기 좋음)
+                if "환율" in name:
+                    msg += f"- {name}: {curr:,.2f}원 {change_str}\n"
+                else:
+                    msg += f"- {name}: {curr:,.0f} {change_str}\n"
+        except:
+            msg += f"- {name}: 확인 불가\n"
+
+    # [B] 미국 관련 (yfinance - 미국 소스)
+    us_indices = {
         "🇺🇸 S&P500": "^GSPC",
         "💻 나스닥": "^IXIC",
         "😱 공포지수": "^VIX"
     }
     
-    msg += "🌎 *글로벌 시장 지표*\n"
-    for name, ticker in indices.items():
+    for name, ticker in us_indices.items():
         try:
             stock = yf.Ticker(ticker)
+            # 5일치 데이터를 가져와서 비교
             hist = stock.history(period="5d")
-            
             if len(hist) >= 1:
                 price = hist['Close'].iloc[-1]
                 change_str = ""
@@ -97,11 +124,8 @@ def get_market_indices():
                     else:
                         icon = "🔺" if change > 0 else "💙" if change < 0 else "➖"
                     change_str = f"({change:+.2f}%) {icon}"
-
-                if "환율" in name:
-                    msg += f"- {name}: {price:,.2f}원 {change_str}\n"
-                else:
-                    msg += f"- {name}: {price:,.2f} {change_str}\n"
+                    
+                msg += f"- {name}: {price:,.2f} {change_str}\n"
         except:
             msg += f"- {name}: 확인 불가\n"
             
@@ -113,18 +137,17 @@ def get_market_indices():
 def get_fear_and_greed_index():
     url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
     headers = {"User-Agent": "Mozilla/5.0"}
-    
     try:
         response = requests.get(url, headers=headers, timeout=10)
         data = response.json()
-        fng_value = int(data['fear_and_greed']['score'])
-        fng_rating = data['fear_and_greed']['rating']
+        score = int(data['fear_and_greed']['score'])
+        rating = data['fear_and_greed']['rating']
         
         rating_kor = {
             "extreme fear": "극도의 공포 🥶", "fear": "공포 😨",
             "neutral": "중립 😐", "greed": "탐욕 🤑", "extreme greed": "극도의 탐욕 🔥"
         }
-        return fng_value, rating_kor.get(fng_rating, fng_rating)
+        return score, rating_kor.get(rating, rating)
     except:
         return None, None
 
@@ -136,36 +159,27 @@ def get_stock_news_and_events(ticker):
         stock = yf.Ticker(ticker)
         info_msg = ""
         
-        # 뉴스
         news_list = stock.news
         if news_list:
             title = news_list[0].get('title', '제목 없음')
-            # 텔레그램 마크다운 특수문자 충돌 방지
             title = title.replace('[', '(').replace(']', ')')
             info_msg += f"  📰 {title}\n"
 
-        # 실적발표
         cal = stock.calendar
         if cal and 'Earnings Date' in cal:
             earnings_dates = cal['Earnings Date']
             if earnings_dates:
                 next_earnings = earnings_dates[0].strftime("%Y-%m-%d")
                 info_msg += f"  📢 실적발표: {next_earnings}\n"
-        
         return info_msg
     except:
         return ""
 
 # =========================================================
-# 6. 원자재 시세 (금, 은, 구리)
+# 6. 원자재 시세
 # =========================================================
 def get_commodity_price():
-    commodities = {
-        '금 (Gold)': 'GC=F',
-        '은 (Silver)': 'SI=F',
-        '구리 (Copper)': 'HG=F'
-    }
-    
+    commodities = {'금(Gold)': 'GC=F', '은(Silver)': 'SI=F', '구리(Copper)': 'HG=F'}
     report = "⛏️ *[원자재 주요 시세]*\n"
     
     end_date = datetime.now()
@@ -174,34 +188,27 @@ def get_commodity_price():
     for name, ticker in commodities.items():
         try:
             df = fdr.DataReader(ticker, start_date, end_date)
-            
             if not df.empty:
-                last_close = df['Close'].iloc[-1]
-                
+                curr = df['Close'].iloc[-1]
                 if len(df) >= 2:
-                    prev_close = df['Close'].iloc[-2]
-                    change = last_close - prev_close
-                    pct_change = (change / prev_close) * 100
-                    
-                    emoji = "🔺" if change > 0 else "💙" if change < 0 else "➖"
-                    report += f"- {name}: ${last_close:,.2f} ({emoji} {pct_change:.2f}%)\n"
+                    prev = df['Close'].iloc[-2]
+                    pct = ((curr - prev) / prev) * 100
+                    emoji = "🔺" if pct > 0 else "💙" if pct < 0 else "➖"
+                    report += f"- {name}: ${curr:,.2f} ({emoji} {pct:.2f}%)\n"
                 else:
-                    report += f"- {name}: ${last_close:,.2f}\n"
+                    report += f"- {name}: ${curr:,.2f}\n"
             else:
                 report += f"- {name}: 데이터 없음\n"
-                
-        except Exception:
+        except:
             report += f"- {name}: 정보 없음\n"
-            
     return report + "------------------\n"
 
 # =========================================================
 # [최종] 메인 실행 로직
 # =========================================================
 if __name__ == "__main__":
-    print("🚀 봇 실행 시작 (데이터 수집 중...)")
+    print("🚀 봇 실행 시작...")
     
-    # 1. 시간 설정
     kst = pytz.timezone('Asia/Seoul')
     now = datetime.now(kst)
     current_time_str = now.strftime("%Y-%m-%d %H:%M")
@@ -210,32 +217,31 @@ if __name__ == "__main__":
     title = "🌙 *[미국주식 프리장 체크]*" if is_evening_mode else "📈 *[맷투자 모닝 브리핑]*"
     bot_message = f"{title}\n📅 {current_time_str}\n------------------\n"
     
-    # 2. 날씨
+    # 1. 날씨
     try:
         print("1. 날씨 수집 중...")
         bot_message += "🌤 *오늘의 날씨*\n"
         bot_message += get_weather_forecast("Seongdong-gu", "성동구") + "\n"
         bot_message += get_weather_forecast("Gangnam-gu", "대치동") + "\n"
         bot_message += "------------------\n"
-    except Exception as e:
-        print(f"날씨 에러: {e}")
+    except: pass
 
-    # 3. 시장 지표
+    # 2. 시장 지표 (여기서 fdr로 네이버 데이터 가져옴)
     print("2. 시장 지표 수집 중...")
     bot_message += get_market_indices()
     
-    # 4. 공포탐욕지수
+    # 3. 공포지수
     print("3. 공포지수 수집 중...")
-    fng_score, fng_rating = get_fear_and_greed_index()
-    if fng_score:
-        bot_message += f"😨 *CNN 공포/탐욕 지수*\n점수: *{fng_score}* / 상태: *{fng_rating}*\n------------------\n"
+    score, rating = get_fear_and_greed_index()
+    if score:
+        bot_message += f"😨 *CNN 공포/탐욕 지수*\n점수: *{score}* / 상태: *{rating}*\n------------------\n"
     
-    # 5. 원자재
-    print("4. 원자재 시세 수집 중...")
+    # 4. 원자재
+    print("4. 원자재 수집 중...")
     bot_message += get_commodity_price()
 
-    # 6. 개별 주식
-    print("5. 주식 정보 수집 중...")
+    # 5. 개별 주식
+    print("5. 주식 수집 중...")
     tickers = ["SWKS","NVDA","GOOGL","AMZN","TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO","NFLX","IONQ","PLTR","ETN", "TSM", "MU", "AXON","META","BTC-USD", "ETH-USD"]
     news_watch_list = ["SWKS","NVDA","GOOGL","AMZN","TSLA", "AAPL", "MSFT", "SOXL", "LABU", "TQQQ", "RETL","FNGU", "ETHT", "AVGO","NFLX","IONQ","PLTR","ETN", "TSM", "MU", "AXON","META"]
     
@@ -244,19 +250,24 @@ if __name__ == "__main__":
     for ticker in tickers:
         try:
             stock = yf.Ticker(ticker)
+            # 프리장/정규장 구분
             if is_evening_mode:
                 hist = stock.history(period="1d", interval="1m", prepost=True)
             else:
                 hist = stock.history(period="2d")
             
             if not hist.empty:
-                current_price = hist['Close'].iloc[-1]
-                prev_close = hist['Close'].iloc[0] if is_evening_mode else (hist['Close'].iloc[-2] if len(hist) >= 2 else current_price)
+                curr = hist['Close'].iloc[-1]
+                # 등락률 기준점 설정
+                if is_evening_mode:
+                    prev = stock.info.get('previousClose', hist['Close'].iloc[0])
+                else:
+                    prev = hist['Close'].iloc[-2] if len(hist) >= 2 else curr
                 
-                change = ((current_price - prev_close) / prev_close) * 100 if prev_close > 0 else 0
-                emoji = "🔺" if change > 0 else "💙" if change < 0 else "➖"
+                pct = ((curr - prev) / prev) * 100 if prev > 0 else 0
+                emoji = "🔺" if pct > 0 else "💙" if pct < 0 else "➖"
                 
-                bot_message += f"{emoji} *{ticker}*: ${current_price:.2f} ({change:+.2f}%)\n"
+                bot_message += f"{emoji} *{ticker}*: ${curr:.2f} ({pct:+.2f}%)\n"
                 
                 if ticker in news_watch_list:
                     bot_message += get_stock_news_and_events(ticker)
@@ -266,8 +277,6 @@ if __name__ == "__main__":
         except:
             bot_message += f"⚠️ {ticker}: 조회 실패\n"
 
-    # 7. 최종 전송
     print("\n--- 전송될 메시지 ---")
     print(bot_message)
-    print("--------------------")
     send_telegram(bot_message)
