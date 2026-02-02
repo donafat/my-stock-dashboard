@@ -266,19 +266,43 @@ if __name__ == "__main__":
     for ticker in tickers:
         try:
             stock = yf.Ticker(ticker)
-            if is_evening_mode:
-                hist = stock.history(period="1d", interval="1m", prepost=True)
-            else:
-                hist = stock.history(period="2d")
+            curr = None
+            prev = None
             
-            if not hist.empty:
-                curr = hist['Close'].iloc[-1]
-                if is_evening_mode:
-                    prev = stock.info.get('previousClose', hist['Close'].iloc[0])
-                else:
-                    prev = hist['Close'].iloc[-2] if len(hist) >= 2 else curr
+            # [저녁 모드: 프리장] fast_info를 사용하여 실시간 가격 확보
+            if is_evening_mode:
+                try:
+                    # fast_info는 지연 없이 최신가(프리마켓 포함)를 가져옴
+                    curr = stock.fast_info['last_price']
+                    prev = stock.fast_info['previous_close']
+                except:
+                    # 실패 시 기존 방식(history)으로 백업
+                    pass
+
+            # [데이터가 없거나 아침 모드] 기존 history 방식 사용
+            if curr is None:
+                # 프리장일 때는 prepost=True, 아닐 때는 일반 데이터
+                hist = stock.history(period="1d" if is_evening_mode else "2d", 
+                                   interval="1m" if is_evening_mode else "1d",
+                                   prepost=True)
                 
-                pct = ((curr - prev) / prev) * 100 if prev > 0 else 0
+                if not hist.empty:
+                    curr = hist['Close'].iloc[-1]
+                    if is_evening_mode:
+                        # 프리장일 때 전일 종가는 info에서 가져오거나 history 첫 값
+                        prev = stock.info.get('previousClose', hist['Close'].iloc[0])
+                    else:
+                        # 아침(종가)일 때 전일 종가는 2일치 중 앞의 것
+                        prev = hist['Close'].iloc[-2] if len(hist) >= 2 else curr
+
+            # [결과 메시지 생성]
+            if curr is not None and prev is not None:
+                # 0으로 나누기 방지
+                if prev > 0:
+                    pct = ((curr - prev) / prev) * 100
+                else:
+                    pct = 0.0
+                
                 emoji = "🔺" if pct > 0 else "💙" if pct < 0 else "➖"
                 
                 bot_message += f"{emoji} *{ticker}*: ${curr:.2f} ({pct:+.2f}%)\n"
@@ -287,8 +311,11 @@ if __name__ == "__main__":
                     bot_message += get_stock_news_and_events(ticker)
             else:
                 bot_message += f"⚠️ {ticker}: 데이터 없음\n"
+            
             time.sleep(0.2)
-        except:
+            
+        except Exception as e:
+            print(f"[{ticker}] 에러: {e}")
             bot_message += f"⚠️ {ticker}: 조회 실패\n"
 
     print("\n--- 전송될 메시지 ---")
