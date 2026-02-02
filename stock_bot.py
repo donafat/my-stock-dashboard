@@ -278,25 +278,24 @@ if __name__ == "__main__":
         time.sleep(0.3)
 #원자재(금,은,구리 시세추가 2026-02-02)
 def get_commodity_price():
-    # ▼ 여기부터는 def보다 안쪽으로 들어가 있어야 합니다 (스페이스 4칸)
+    # [수정 핵심] datetime 모듈을 dt라는 이름으로 새로 불러와서 충돌을 막습니다.
+    import datetime as dt
+    import FinanceDataReader as fdr
     
-    # 1. 가져올 원자재 목록 정의
     commodities = {
         '금 (Gold)': 'GC=F',
         '은 (Silver)': 'SI=F',
         '구리 (Copper)': 'HG=F'
     }
     
-    # 2. 결과 메시지 만들기
     report = "\n⛏️ [원자재 주요 시세]\n"
     
-    # 날짜 설정
-    end_date = datetime.datetime.now()
-    start_date = end_date - datetime.timedelta(days=7)
+    # dt를 사용해서 날짜를 계산합니다.
+    end_date = dt.datetime.now()
+    start_date = end_date - dt.timedelta(days=7)
     
     for name, ticker in commodities.items():
         try:
-            # 데이터 조회
             df = fdr.DataReader(ticker, start_date, end_date)
             
             if not df.empty:
@@ -307,7 +306,6 @@ def get_commodity_price():
                     change = last_close - prev_close
                     pct_change = (change / prev_close) * 100
                     
-                    # 이모지 설정
                     emoji = "🔺" if change > 0 else "🔵" if change == 0 else "💙"
                     if change < 0: emoji = "📉"
                     
@@ -318,7 +316,7 @@ def get_commodity_price():
                 report += f"{name}: 데이터 조회 실패\n"
                 
         except Exception as e:
-            report += f"{name}: 정보 없음 ({str(e)})\n"
+            report += f"{name}: 정보 없음\n"
             
     return report
     stock_message = "기존 주식 정보...\n" 
