@@ -10,7 +10,7 @@ import FinanceDataReader as fdr
 def send_telegram_message(msg):
     token = os.environ.get('TELEGRAM_TOKEN')
     chat_id = os.environ.get('TELEGRAM_CHAT_ID')
- if not token or not chat_id:
+    if not token or not chat_id:
         print("❌ 오류: 텔레그램 토큰(TELEGRAM_TOKEN)이나 채팅 ID(CHAT_ID)를 찾을 수 없습니다.")
         print("   GitHub 설정(Secrets)을 확인하거나, .yml 파일의 env 설정을 확인해주세요.")
         return
