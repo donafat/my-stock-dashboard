@@ -31,10 +31,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 라이브러리 설치
-        run: python -m pip install --upgrade pip
-             pip install -r requirements.txt
-             pip install finance-datareader
+  - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install finance-datareader
 
       - name: 주식 봇 실행 (텔레그램 전송 포함)
         env:  # <--- 이 부분이 '비밀번호 건네주는' 핵심 명령입니다!
