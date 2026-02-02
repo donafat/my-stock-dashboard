@@ -4,7 +4,7 @@ import requests
 import pytz
 import yfinance as yf
 import FinanceDataReader as fdr
-from datetime import datetime
+from datetime import datetime, timedelta  # <--- 여기에 timedelta를 추가했습니다!
 
 # =========================================================
 # 1. 텔레그램 전송 함수
@@ -44,8 +44,10 @@ def get_weather_forecast(location_eng, location_kor):
             if response.status_code == 200:
                 data = response.json()
                 weather_today = data['weather'][0]['hourly']
-                am_data = weather_today[3] # 09:00
-                pm_data = weather_today[6] # 18:00
+                
+                # 시간대별 예보 (오전 9시, 오후 6시)
+                am_data = weather_today[3] 
+                pm_data = weather_today[6] 
                 
                 result = f"📍 *{location_eng}* ({location_kor})\n"
                 result += f" - 기온: {am_data['tempC']}°C / {pm_data['tempC']}°C\n"
@@ -159,9 +161,9 @@ def get_commodity_price():
     
     report = "⛏️ *[원자재 주요 시세]*\n"
     
-    # 최근 7일치 데이터 조회
+    # [수정됨] pytz.timedelta -> timedelta 로 변경
     end_date = datetime.now()
-    start_date = end_date - pytz.timedelta(days=7)
+    start_date = end_date - timedelta(days=7) 
     
     for name, ticker in commodities.items():
         try:
@@ -202,7 +204,7 @@ if __name__ == "__main__":
     title = "🌙 *[미국주식 프리장 체크]*" if is_evening_mode else "📈 *[맷투자 모닝 브리핑]*"
     bot_message = f"{title}\n📅 {current_time_str}\n------------------\n"
     
-    # 2. 날씨 (오류 방지를 위해 try-except)
+    # 2. 날씨
     try:
         print("1. 날씨 수집 중...")
         bot_message += "🌤 *오늘의 날씨*\n"
@@ -222,7 +224,7 @@ if __name__ == "__main__":
     if fng_score:
         bot_message += f"😨 *CNN 공포/탐욕 지수*\n점수: *{fng_score}* / 상태: *{fng_rating}*\n------------------\n"
     
-    # 5. 원자재 (여기에 추가!)
+    # 5. 원자재
     print("4. 원자재 시세 수집 중...")
     bot_message += get_commodity_price()
 
